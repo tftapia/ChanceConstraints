@@ -2,7 +2,7 @@ import cvxpy as cp
 import numpy as np
 
 # Problem data.
-m = 20
+m = 30
 n = 20
 np.random.seed(1)
 A = np.random.randn(m, n)
