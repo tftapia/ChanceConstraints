@@ -79,13 +79,13 @@ def hard_problem():
     cp_n = np.array([25,66])
     calpha_n = np.array([40,80])
     cbeta_n = np.array([80,100])
-    p_n_max = np.array([100,100])
+    p_n_max = np.array([35,55])
     epsilon = 0.05
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.02
     inv_phi_ext = norm.ppf(1-epsilon_ext)
 
-    w_bar = 5
+    w_bar = 10
     w_sigma = 5
 
     ## Generator 1
@@ -117,9 +117,9 @@ def hard_problem():
 
     # Constraints
     constraints = []
-    constraints.append(sum(p_n) + w_bar == d)
-    constraints.append(1- sum(alpha_n) == 0)
-    constraints.append(1- sum(beta_n) == 0)
+    constraints.append(sum(p_n) + w_bar - d == 0)
+    constraints.append(sum(alpha_n) - 1== 0)
+    constraints.append(sum(beta_n) - 1== 0)
 
     ## Generator 1
     constraints.append(cp.SOC(c_ab.T @ g1_aux_abwp, A_ab @ g1_aux_abwp))
@@ -145,7 +145,7 @@ def hard_problem():
     constraints.append(w_star == g1_aux_abwp[3]- g1_aux_abwm[3])
     constraints.append(lambda_n1 == g1_aux_ablp[3]- g1_aux_ablm[3])
     constraints.append(w_star/w_sigma + g1_aux_ablp[0] - g1_aux_ablm[0] == 0)
-    constraints.append(p_n[0] - p_n_max[0] - g1_aux_abwp[3] + g1_aux_abwm[3] == 0)
+    constraints.append(p_n[0] - p_n_max[0] - g1_aux_abwp[0] + g1_aux_abwm[0] == 0)
 
     ## Generator 2
     constraints.append(cp.SOC(c_ab.T @ g2_aux_abwp, A_ab @ g2_aux_abwp))
@@ -168,10 +168,10 @@ def hard_problem():
     constraints.append(g2_aux_ablp >= 0)
     constraints.append(g2_aux_ablm >= 0)
 
-    constraints.append(w_star == g2_aux_abwp[3]- g2_aux_abwm[3])
+    constraints.append(w_star == g2_aux_abwp[3] - g2_aux_abwm[3])
     constraints.append(lambda_n2 == g2_aux_ablp[3]- g2_aux_ablm[3])
     constraints.append(w_star/w_sigma + g2_aux_ablp[0] - g2_aux_ablm[0] == 0)
-    constraints.append(p_n[1] - p_n_max[1] - g2_aux_abwp[3] + g2_aux_abwm[3] == 0)
+    constraints.append(p_n[1] - p_n_max[1] - g2_aux_abwp[0] + g2_aux_abwm[0] == 0)
 
     # Bounds
     constraints.append(w_star/np.power(w_sigma,2) - inv_phi_ext <= 0)
@@ -186,12 +186,15 @@ def hard_problem():
     print("\nThe optimal value is", problem.value)
     print("A solution w_star is")
     print(w_star.value)
+    #print(w_star.value, g2_aux_abwp[3].value, g2_aux_abwm[3].value, g2_aux_abwp[3].value,g2_aux_abwm[3].value)
     print("A solution p_n is")
     print(p_n.value)
     print("A solution alpha_n is")
     print(alpha_n.value)
     print("A solution beta_n is")
     print(beta_n.value)
+    #print("A solution lambda is")
+    #print([lambda_n1.value, lambda_n2.value ])
     print("The demand constraint dual solution is")
     print(problem.constraints[0].dual_value)
     print("The normal reserve constraint dual solution is")
