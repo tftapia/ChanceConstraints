@@ -67,10 +67,6 @@ def EconomicDispatch():
     print("A solution t1 is")
     print("{}: {}".format(t_1.varName, t_1.X))
 
-
-EconomicDispatch()
-
-
 def test_function():
     import gurobipy as gp
     from gurobipy import GRB
@@ -154,4 +150,75 @@ def test_function_2():
     print("Optimal Solution:")
     print("Expected Value:", x.x)
 
-test_function_2()
+#test_function()
+
+
+
+'''
+cdf_mean  = 12
+cdf_deviation = 5
+x = 6
+valor = norm.cdf((x-cdf_mean)/cdf_deviation)
+z = (x-cdf_mean)/cdf_deviation
+'''
+
+# functions
+def pdf_function(x):
+    phi = np.exp((-1/2)*x**2)/np.sqrt(2*np.pi)
+    return phi
+
+# initial function WCC
+def truncated_normal_funtion(mu,sigma):
+    z_aux = (-mu/sigma) 
+    wcc = mu*(1- norm.cdf(z_aux)) + (sigma/(np.sqrt(2*np.pi)))*np.exp((-1/2)*z_aux**2)
+    return wcc
+
+def truncated_normal_funtion_dmu(mu,sigma):
+    z_aux = (-mu/sigma)
+    term_1 = (1-norm.cdf(z_aux))
+    term_2 = mu*((1/sigma)*norm.pdf(z_aux))
+    term_3 = -(mu/(sigma*np.sqrt(2*np.pi)))*np.exp((-1/2)*z_aux**2)
+    wcc_dmu = term_1 + term_2 + term_3
+    return wcc_dmu
+
+def truncated_normal_funtion_dsigma(mu,sigma):
+    z_aux = (-mu/sigma)
+    term_1 = -((mu**2)/(sigma**2))*norm.pdf(z_aux)
+    term_2 = (1/np.sqrt(2*np.pi))*(1-((mu**2)/(sigma**2)))*np.exp((-1/2)*z_aux**2)
+    wcc_dsigma = term_1 + term_2
+    return wcc_dsigma
+
+def taylor_approximation(mu,sigma,a,b):
+    term_1 = truncated_normal_funtion(a,b)
+    term_2 = truncated_normal_funtion_dmu(a,b)*(mu-a)
+    term_3 = truncated_normal_funtion_dsigma(a,b)*(sigma-b)
+    t_approx = term_1 + term_2 + term_3
+    return t_approx
+
+'''
+a = truncated_normal_funtion(cdf_mean,cdf_deviation)
+b = truncated_normal_funtion_dmu(cdf_mean,cdf_deviation)
+c = truncated_normal_funtion_dsigma(cdf_mean,cdf_deviation)
+
+print('function, %s' % a)
+print('dmu, %s' % b)
+print('dsigma, %s' % c)
+'''
+
+cdf_mean  = 12
+cdf_deviation = 5
+test_tnf = truncated_normal_funtion(cdf_mean,cdf_deviation)
+
+ref_mean = 11
+ref_deviation = 5
+test_taylor = taylor_approximation(cdf_mean,cdf_deviation,ref_mean,ref_deviation)
+
+print('function_tnf, %s' % test_tnf)
+print('function_taylor, %s' % test_taylor)
+
+# pdf (density)
+# norm.pdf(x)
+#inverse cdf   
+#norm.cdf(-1.96)
+#inverse cdf
+#norm.ppf(norm.cdf(1.96))
