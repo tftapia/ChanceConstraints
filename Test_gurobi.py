@@ -5,13 +5,13 @@ from scipy.stats import norm
 
 def EconomicDispatch():
     # Parameters
-    N = 1
-    d = np.array([70])
+    N = 2
+    d = np.array([120])
 
-    c_p_n = np.array([25,50, 30]) # 25, 66
-    c_alpha_n = np.array([40,30, 35]) # 40, 80
-    c_beta_n = np.array([40,100,110]) # 80, 100 
-    p_n_max = np.array([100,100,100])
+    c_p_n = np.array([30,30, 30]) # 25, 66
+    c_alpha_n = np.array([50,60, 60]) # 40, 80
+    c_beta_n = np.array([60,60,70]) # 80, 100 
+    p_n_max = np.array([120,100,100])
 
     epsilon = 0.05
     inv_phi_eps = norm.ppf(1-epsilon)
@@ -19,7 +19,7 @@ def EconomicDispatch():
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
 
-    w_bar = 10
+    w_bar = 20
     w_sigma = 4
 
     # Model 
@@ -161,20 +161,20 @@ def EconomicDispatch_LDT_old():
 def EconomicDispatch_LDT():
     # Parameters
     N = 2
-    d = np.array([70])
+    d = np.array([120])
 
-    c_p_n = np.array([35,50, 30]) # 25, 66
-    c_alpha_n = np.array([20,20, 35]) # 40, 80
-    c_beta_n = np.array([20,30,110]) # 80, 100 
-    p_n_max = np.array([50,60,100])
+    c_p_n = np.array([30,30, 30]) # 25, 66
+    c_alpha_n = np.array([50,60, 60]) # 40, 80
+    c_beta_n = np.array([60,60,70]) # 80, 100 
+    p_n_max = np.array([120,100,100])
 
     epsilon = 0.05
     inv_phi_eps = norm.ppf(1-epsilon)
 
-    epsilon_ext = 0.05
+    epsilon_ext = 0.01
     inv_phi_ext = norm.ppf(epsilon_ext)
 
-    w_bar = 10
+    w_bar = 20
     w_sigma = 4
 
     # Model 
@@ -208,7 +208,7 @@ def EconomicDispatch_LDT():
     ## LDT Constraint
     model.addConstr(w_sigma**(-0.5)*omega_star + inv_phi_ext <= 0)
     model.addConstrs(w_sigma**(-1)*omega_star + aux_lambda_a[n] + aux_lambda_b[n] == 0 for n in range(N))
-    model.addConstrs(-p_n_max[n] + p_n[n] - aux_omega_a[n] - aux_omega_b[n]== 0 for n in range(N))
+    model.addConstrs(-p_n_max[n] + p_n[n] - aux_omega_a[n] - aux_omega_b[n] == 0 for n in range(N))
 
     # Objective function
     obj = model.setObjective(sum(c_p_n[n]*p_n[n] + c_alpha_n[n]*alpha_n[n] + c_beta_n[n]*beta_n[n] for n in range(N)),GRB.MINIMIZE)
@@ -317,7 +317,6 @@ def EconomicDispatch_LDT_2(omega_star, lambda_n):
     #    print("{}: {}".format(v.varName, v.X))
     #for c in cons_reserve.values():
     #    print("{}: {}".format(c.constrName, c.Pi))  # .QCPi is used for quadratic constraints
-
 
 def EconomicDispatch_LDT_less():
     # Parameters
