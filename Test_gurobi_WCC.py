@@ -504,41 +504,68 @@ desviacion_lower = np.sqrt((w_sigma*alpha_n_star[n])**2 *(1 + z_auxiliar*norm.pd
 media_greater = p_n_star[n]-p_n_max[n] + alpha_n_star[n]*w_sigma*norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))
 desviacion_greater = np.sqrt(((w_sigma*alpha_n_star[n])**2) *(1 + z_auxiliar*norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))**2))
 '''
-
-
-
-value_crit = -1
+value_crit = -4
 mu_known = 2
 sigma_known = 3
 
 z_auxiliar = (value_crit- mu_known)/sigma_known
 print('z_auxiliar',z_auxiliar)
-frac_auxiliar = norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)
-print("fraction_auxiliar",frac_auxiliar)
+
 
 #parameters
 mu = 2
-sigma = 3.001
+sigma = 3.002
+test_conditional_negative = False# True
+test_conditional_positive = True
 
-tnf = truncated_normal_funtion(mu,sigma)
-tnf_taylor = truncated_normal_funtion(mu_known,sigma_known) + (mu-mu_known)*truncated_normal_funtion_dmu(mu_known,sigma_known) + (sigma - sigma_known)*truncated_normal_funtion_dsigma(mu_known,sigma_known)
-print("tnf {}, tnf_taylor {}".format(tnf, tnf_taylor))
 
-media_lower = mu + sigma*frac_auxiliar
-print("term1 {}, term2 {}, term3 {}, sum {}".format(1,z_auxiliar*(frac_auxiliar),- (frac_auxiliar)**2, (1+z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2)))
-sd_lower = (sigma)*np.sqrt((1+z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2))
-print("media_cond {}, sd_cond {}".format(media_lower, sd_lower))
-'''
-media_lower_known = mu_known + sigma_known*frac_auxiliar
-sd_lower_known = np.sqrt(((sigma_known)**2)*(1+z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2))
-print("media_cond_know {}, sd_cond_known {}".format(media_lower_known, sd_lower_known))
+if test_conditional_negative == True:
+    frac_auxiliar = norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)
+    print("fraction_auxiliar",frac_auxiliar)
 
-tnf_cond = truncated_normal_funtion(media_lower,sd_lower)
-tnf_taylor_cond = truncated_normal_funtion(media_lower_known,sd_lower_known) 
-+ (media_lower -media_lower_known)*truncated_normal_funtion_dmu(media_lower_known,sd_lower_known) 
-+ (sd_lower- sd_lower_known)*truncated_normal_funtion_dsigma(media_lower_known,sd_lower_known)
+    tnf = truncated_normal_funtion(mu,sigma)
+    tnf_taylor = truncated_normal_funtion(mu_known,sigma_known) - (mu-mu_known)*truncated_normal_funtion_dmu(mu_known,sigma_known) - (sigma - sigma_known)*truncated_normal_funtion_dsigma(mu_known,sigma_known)
+    print("tnf {}, tnf_taylor {}".format(tnf, tnf_taylor))
 
-print("tnf_cond {}, tnf_taylor_cond {}".format(tnf_cond, tnf_taylor_cond))
+    media_lower = mu + sigma*frac_auxiliar
+    print("term1 {}, term2 {}, term3 {}, sum {}".format(1,z_auxiliar*(frac_auxiliar), -(frac_auxiliar)**2, (1+z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2)))
+    sd_lower = (sigma)*np.sqrt((1-z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2))
+    print("media_cond {}, sd_cond {}".format(media_lower, sd_lower))
+
+    media_lower_known = mu_known + sigma_known*frac_auxiliar
+    sd_lower_known = np.sqrt(((sigma_known)**2)*(1-z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2))
+    print("media_cond_know {}, sd_cond_known {}".format(media_lower_known, sd_lower_known))
+
+    tnf_cond = truncated_normal_funtion(media_lower,sd_lower)
+    tnf_taylor_cond = truncated_normal_funtion(media_lower_known,sd_lower_known) 
+    + (media_lower -media_lower_known)*truncated_normal_funtion_dmu(media_lower_known,sd_lower_known) 
+    + (sd_lower- sd_lower_known)*(truncated_normal_funtion_dsigma(media_lower_known,sd_lower_known)+truncated_normal_funtion_dmu(media_lower_known,sd_lower_known))
+
+    print("tnf_cond {}, tnf_taylor_cond {}".format(tnf_cond, tnf_taylor_cond))
+
+if test_conditional_positive == True:
+    frac_auxiliar = norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))
+    print("fraction_auxiliar",frac_auxiliar)
+
+    tnf = truncated_normal_funtion(mu,sigma)
+    tnf_taylor = truncated_normal_funtion(mu_known,sigma_known) - (mu-mu_known)*truncated_normal_funtion_dmu(mu_known,sigma_known) - (sigma - sigma_known)*truncated_normal_funtion_dsigma(mu_known,sigma_known)
+    print("tnf {}, tnf_taylor {}".format(tnf, tnf_taylor))
+
+    media_lower = mu + sigma*frac_auxiliar
+    print("term1 {}, term2 {}, term3 {}, sum {}".format(1,z_auxiliar*(frac_auxiliar),- (frac_auxiliar)**2, (1+z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2)))
+    sd_lower = (sigma)*np.sqrt((1-z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2))
+    print("media_cond {}, sd_cond {}".format(media_lower, sd_lower))
+
+    media_lower_known = mu_known + sigma_known*frac_auxiliar
+    sd_lower_known = np.sqrt(((sigma_known)**2)*(1-z_auxiliar*(frac_auxiliar) - (frac_auxiliar)**2))
+    print("media_cond_know {}, sd_cond_known {}".format(media_lower_known, sd_lower_known))
+
+    tnf_cond = truncated_normal_funtion(media_lower,sd_lower)
+    tnf_taylor_cond = truncated_normal_funtion(media_lower_known,sd_lower_known) 
+    + (media_lower -media_lower_known)*truncated_normal_funtion_dmu(media_lower_known,sd_lower_known) 
+    + (sd_lower- sd_lower_known)*(truncated_normal_funtion_dsigma(media_lower_known,sd_lower_known)+truncated_normal_funtion_dmu(media_lower_known,sd_lower_known))
+
+    print("tnf_cond {}, tnf_taylor_cond {}".format(tnf_cond, tnf_taylor_cond))
+
 
 #truncated_normal_funtion_dmu(mu,sigma) + truncated_normal_funtion_dsigma(mu,sigma)
-'''
