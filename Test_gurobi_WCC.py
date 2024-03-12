@@ -221,24 +221,108 @@ def cutting_planes_problem_WCC_ED():
     print("A solution alpha_n is")
     print("{}: {}".format(alpha_n.varName, alpha_n.X))
 
-cutting_planes_problem_ED()
+def cutting_planes_problem_WCC_PW():
+    flag_print = False
+    # Parameters
+    N = 3
+    d = np.array([120])
+
+    c_p_n = np.array([15,30, 45]) # 25, 66
+    c_alpha_n = np.array([50,60, 60]) # 40, 80
+    p_n_max = np.array([30,30,50])
+
+    epsilon = 0.07
+    inv_phi_eps = norm.ppf(1-epsilon)
+
+    w_bar = 20
+    w_sigma = 4
+
+    # Define model
+    model = gb.Model()
+
+    # Variables
+    p_n = model.addMVar(N, vtype=GRB.CONTINUOUS, name="p_n", lb=0)         # Generation variable
+    alpha_n = model.addMVar(N, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
+
+    # Constraints
+    cons_demand = model.addConstr(sum(p_n[n] for n in range(N)) + w_bar == d, name='cons_demand') # Energy balance constraint
+    cons_reserve = model.addConstr(sum(alpha_n[n] for n in range(N)) == 1, name='cons_reserve')   # Operational reserve
+
+    # Objective function
+    obj = model.setObjective(sum(c_p_n[n]*p_n[n] + c_alpha_n[n]*alpha_n[n] for n in range(N)),GRB.MINIMIZE)
+
+    # Solve
+    model.optimize()
+
+    # Add cutting planes until the optimal solution satisfy the WCC constraint
+    n_iterations = 100
+    continue_flag = True
+    for _ in range(n_iterations):
+        model.optimize()
+        obj_value = model.getObjective()
+
+        if flag_print == True:
+            print('ITERATION, %s' % _)
+            print("The optimal value is", obj_value.getValue())
+            print("A solution p_n is")
+            print("{}: {}".format(p_n.varName, p_n.X))
+            print("A solution alpha_n is")
+            print("{}: {}".format(alpha_n.varName, alpha_n.X))
+
+        # Save variables
+        p_n_star = dict()
+        alpha_n_star = dict()
+
+        for n in range(N):
+            p_n_star[n] = model.getVarByName('p_n[%d]'%(n)).X
+            alpha_n_star[n] = model.getVarByName('alpha_n[%d]'%(n)).X
+
+        # Check if solution satisfy the WCC constraint
+        if all(p_n_star[n] + alpha_n_star[n]*inv_phi_eps*w_sigma <=p_n_max[n] for n in range(N)):
+            break
+
+        # Add a cutting plane to the model 
+        for n in range(N):
+            w_critic = 20
+            z_auxiliar = w_critic/w_sigma
+            media_lower = p_n_star[n]-p_n_max[n] + alpha_n_star[n]*w_sigma*norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)
+            desviacion_lower = np.sqrt((alpha_n_star[n]*w_sigma)**2 * (1 + z_auxiliar*norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar) - (norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))**2))
+
+            media_greater = p_n_star[n]-p_n_max[n] + alpha_n_star[n]*w_sigma*norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))
+            desviacion_greater = np.sqrt((alpha_n_star[n]*w_sigma)**2 * (1 + z_auxiliar*norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))**2))
+
+            if truncated_normal_funtion(media_lower, desviacion_lower) + truncated_normal_funtion(media_greater, desviacion_greater) >= epsilon:
+                print('ERROR in iterration, %s, with generador, %s' %(_,n))
+                model.addConstr(
+                    truncated_normal_funtion(media_lower, desviacion_lower) 
+                    + ((p_n[n]-p_n_max[n]) - media_lower)*truncated_normal_funtion_dmu(media_lower, desviacion_lower) 
+                    + ((alpha_n[n]*w_sigma) - desviacion_lower)*truncated_normal_funtion_dsigma(media_lower, desviacion_lower) 
+                    + truncated_normal_funtion(media_greater, desviacion_greater) 
+                    + ((p_n[n]-p_n_max[n]) - media_greater)*truncated_normal_funtion_dmu(media_greater, desviacion_greater) 
+                    + ((alpha_n[n]*w_sigma) - desviacion_greater)*truncated_normal_funtion_dsigma(media_greater, desviacion_greater)
+                    <= epsilon)
+        
+        '''
+        term_1 = truncated_normal_funtion(a,b)
+        term_2 = truncated_normal_funtion_dmu(a,b)*(mu-a)
+        term_3 = truncated_normal_funtion_dsigma(a,b)*(sigma-b)
+        t_approx = term_1 + term_2 + term_3
+        '''
+
+    ## Primal solution
+    obj_value = model.getObjective() 
+    print("\nStatus:", model.status)        
+    print("The optimal value is", obj_value.getValue())
+    print("A solution p_n is")
+    print("{}: {}".format(p_n.varName, p_n.X))
+    print("A solution alpha_n is")
+    print("{}: {}".format(alpha_n.varName, alpha_n.X))
+
+#cutting_planes_problem_ED()
 #cutting_planes_problem_WCC_ED()
+cutting_planes_problem_WCC_PW()
 
 '''
-Status: 2
-The optimal value is 3210.0
-A solution p_n is
-['p_n[0]' 'p_n[1]' 'p_n[2]']: [30. 30. 40.]
-A solution alpha_n is
-['alpha_n[0]' 'alpha_n[1]' 'alpha_n[2]']: [0. 0. 1.]
-
-Status: 2
-The optimal value is 3208.105338289895
-A solution p_n is
-['p_n[0]' 'p_n[1]' 'p_n[2]']: [30.03946673 30.03947154 39.92106173]
-A solution alpha_n is
-['alpha_n[0]' 'alpha_n[1]' 'alpha_n[2]']: [0.01185867 0.01184915 0.97629218]
-
 Status: 2
 The optimal value is 3210.0
 A solution p_n is
@@ -252,4 +336,14 @@ A solution p_n is
 ['p_n[0]' 'p_n[1]' 'p_n[2]']: [30.05541946 30.05543125 39.88914929]
 A solution alpha_n is
 ['alpha_n[0]' 'alpha_n[1]' 'alpha_n[2]']: [0.01625746 0.01623161 0.96751093]
+
+Status: 2
+The optimal value is 3208.499514123805
+A solution p_n is
+['p_n[0]' 'p_n[1]' 'p_n[2]']: [30.0310841  30.03145518 39.93746072]
+A solution alpha_n is
+['alpha_n[0]' 'alpha_n[1]' 'alpha_n[2]']: [0.00961351 0.0072081  0.98317839]
+4.225607144489479
+PS C:\Users\Tom\Desktop\Codes\Research\ChanceConstraints-1> 
+
 '''
