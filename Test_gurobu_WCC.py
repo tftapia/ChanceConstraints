@@ -416,37 +416,44 @@ def cutting_planes_problem_WCC_PW():
 
 def cutting_planes_problem_WCC_PW_beta():
     flag_print = False
-    # Parameters
-    N = 3
-    d = np.array([120])
-
-    c_p_n = np.array([40, 45, 50]) # 25, 66
-    c_alpha_n = np.array([55, 50, 75]) # 50
-    c_beta_n = np.array([65, 70, 95]) # 50
-    p_n_max = np.array([40,40,30])
-
+    #System parameters
     epsilon = 0.05
     inv_phi_eps = norm.ppf(1-epsilon)
-
+    epsilon_ext = 0.05
+    inv_phi_ext = norm.ppf(epsilon_ext)
     w_bar = 20
     w_sigma = 4
 
-    # Define model
+    # Create a new model
     model = gb.Model()
 
-    # Variables
-    p_n = model.addMVar(N, vtype=GRB.CONTINUOUS, name="p_n", lb=0)         # Generation variable
-    alpha_n = model.addMVar(N, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
-    beta_n = model.addMVar(N, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8) # Operational reserve variable adverse
+    # Create variables
+    p_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name='p_n')
+    t_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='t_i')
+    f_ij = model.addVars(lines_node_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='fij')
+    s_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS, name='s_i')
+    alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
+    beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8) # Operational reserve variable adverse
+
+    # Set objective function
+    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
+
+    # Add constraints
+    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar for n in node_wind[i])
+                                 - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
+                                 + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
+                                 + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
+    const_pmax = model.addConstrs((p_n[n] <= gen_max[n] for n in gen_set_index), name='const_pmax')
+    const_f_t = model.addConstrs( (line_susceptance_matrix[i,j]*(t_i[i]-t_i[j]) == f_ij[i,j] for (i,j) in lines_node_index), name='const_f_t')
+    const_fmax = model.addConstrs( (f_ij[i,j] <= line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmax')
+    const_fmin = model.addConstrs( (f_ij[i,j] >= -line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmin')
+    const_t_0 = model.addConstr(t_i[0] == 0)
+    
+    cons_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Operational reserve constraint
+    cons_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Adversarial reserve constraint
 
     # Constraints
-    cons_demand = model.addConstr(sum(p_n[n] for n in range(N)) + w_bar == d, name='cons_demand') # Energy balance constraint
-    cons_reserve = model.addConstr(sum(alpha_n[n] for n in range(N)) == 1, name='cons_reserve')   # Operational reserve
-    cons_reserve_adv = model.addConstr(sum(beta_n[n] for n in range(N)) == 2, name='cons_reserve_adv')   # Operational reserve adv
-    cons_pmax = model.addConstrs((p_n[n]<= p_n_max[n] for n in range(N)), name='cons_pmax') 
-
-    # Objective function
-    obj = model.setObjective(sum(c_p_n[n]*p_n[n] + c_alpha_n[n]*alpha_n[n] + c_beta_n[n]*beta_n[n]for n in range(N)),GRB.MINIMIZE)
+    cons_pmax = model.addConstrs((p_n[n]<= gen_max[n] for n in gen_set_index), name='cons_pmax') 
 
     # Solve
     model.optimize()
@@ -473,7 +480,7 @@ def cutting_planes_problem_WCC_PW_beta():
         alpha_n_star = dict()
         beta_n_star = dict()
 
-        for n in range(N):
+        for n in gen_set_index:
             p_n_star[n] = model.getVarByName('p_n[%d]'%(n)).X
             alpha_n_star[n] = model.getVarByName('alpha_n[%d]'%(n)).X
             beta_n_star[n] = model.getVarByName('beta_n[%d]'%(n)).X
@@ -482,20 +489,20 @@ def cutting_planes_problem_WCC_PW_beta():
         z_auxiliar = w_critic/w_sigma
         # Check if solution satisfy the WCC constraint
         if all(
-            truncated_normal_funtion(p_n_star[n]-p_n_max[n] - alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)),
+            truncated_normal_funtion(p_n_star[n]-gen_set_index[n] - alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)),
                                     (w_sigma*alpha_n_star[n])*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))**2))
                 +
-            truncated_normal_funtion(p_n_star[n]-p_n_max[n] + (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))),
+            truncated_normal_funtion(p_n_star[n]-gen_set_index[n] + (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))),
                                     (w_sigma*(alpha_n_star[n]+beta_n_star[n]))*np.sqrt(1 + z_auxiliar*norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))**2))
             <= epsilon for n in range(N)):
             break
 
         # Add a cutting plane to the model 
-        for n in range(N):
-            media_lower = p_n_star[n]-p_n_max[n] - (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))
+        for n in gen_set_index:
+            media_lower = p_n_star[n]-gen_set_index[n] - (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))
             desviacion_lower = (w_sigma*(alpha_n_star[n]+beta_n_star[n]))*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))**2)
 
-            media_greater = p_n_star[n]-p_n_max[n] + alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))
+            media_greater = p_n_star[n]-gen_set_index[n] + alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))
             desviacion_greater = (w_sigma*alpha_n_star[n])*np.sqrt(1 + z_auxiliar*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))**2)
             print('ITERATION, %s, gen, %s' %(_,n))
             print("media_d {}, sd_d {}, media_u {}, sd_u {}".format(media_lower,desviacion_lower,media_greater,desviacion_greater))
@@ -506,10 +513,10 @@ def cutting_planes_problem_WCC_PW_beta():
                 print('ERROR in iterration, %s, with generador, %s' %(_,n))
                 model.addConstr(
                     truncated_normal_funtion(media_lower, desviacion_lower) 
-                    + ((p_n[n]-p_n_max[n] - (alpha_n[n]+beta_n[n])*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))) - media_lower)*truncated_normal_funtion_dmu(media_lower, desviacion_lower) 
+                    + ((p_n[n]-gen_max[n] - (alpha_n[n]+beta_n[n])*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))) - media_lower)*truncated_normal_funtion_dmu(media_lower, desviacion_lower) 
                     + (((alpha_n[n]+beta_n[n])*w_sigma)*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))**2) - desviacion_lower)*truncated_normal_funtion_dsigma(media_lower, desviacion_lower) 
                     + truncated_normal_funtion(media_greater, desviacion_greater) 
-                    + ((p_n[n]-p_n_max[n] + (alpha_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) ) - media_greater)*truncated_normal_funtion_dmu(media_greater, desviacion_greater) 
+                    + ((p_n[n]-gen_max[n] + (alpha_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) ) - media_greater)*truncated_normal_funtion_dmu(media_greater, desviacion_greater) 
                     + ((alpha_n[n]*w_sigma)*np.sqrt(1 + z_auxiliar*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))**2) - desviacion_greater)*truncated_normal_funtion_dsigma(media_greater, desviacion_greater)
                     <= epsilon)
         
@@ -524,51 +531,6 @@ def cutting_planes_problem_WCC_PW_beta():
     print("{}: {}".format(alpha_n.varName, alpha_n.X))
     print("A solution beta_n is")
     print("{}: {}".format(beta_n.varName, beta_n.X))
-
-# System parameters
-    node_set_index = [0,1,2]
-    gen_set_index = [0,1]
-    lines_node_index = [(0,1),(1,2),(0,2)]
-    line_reactance = [2.5,2.5,2]
-    line_f_max = [25,1000,1000]
-    node_demand = [50,125,125]
-    gen_max = [300,400]
-    gen_cmg = [30,10]
-    gen_node = [1,2]
-
-    # Set gen parameters in matrices
-    node_gens = []
-    for n in node_set_index:
-        aux_list = []
-        for g in gen_set_index:
-            if gen_node[g] == n:
-                aux_list.append(g)
-        node_gens.append(aux_list)
-
-    # Set line parameters in matrices
-    k_nodes = len(node_set_index)
-    line_susceptance_matrix = np.zeros((k_nodes,k_nodes))
-    line_f_max_matrix = np.zeros((k_nodes,k_nodes))
-    for (i,j) in lines_node_index:
-        aux_index = lines_node_index.index((i,j))
-        line_susceptance_matrix[i,j] = -1/line_reactance[aux_index]
-        line_susceptance_matrix[j,i] = -1/line_reactance[aux_index]
-        line_f_max_matrix[i,j] = line_f_max[aux_index]
-        line_f_max_matrix[j,i] = line_f_max[aux_index]
-
-    # Set of lines in/out in each node
-    lines_node_in = []
-    lines_node_out = []
-    for n in node_set_index:
-        aux_list_in = []
-        aux_list_out = []
-        for [i,j] in lines_node_index:
-            if i == n:
-                aux_list_in.append([i,j])
-            elif j == n:
-                aux_list_out.append([i,j])
-        lines_node_in.append(aux_list_in)
-        lines_node_out.append(aux_list_out)
 
 
 def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
@@ -653,6 +615,9 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     print("A solution lambda_n is")
     for v in lambda_n.values():
         print("{}: {}".format(v.varName, v.X))
+    print("A solution f_ij is")
+    for v in f_ij.values():
+        print("{}: {}".format(v.varName, v.X))
 
     #print("A solution aux_omega_a is")
     #print("{}: {}".format(aux_omega_a.varName, aux_omega_a.X ))
@@ -673,12 +638,12 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
 
 
 #cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+#cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 
 ##cutting_planes_problem_WCC_PW()
 ##cutting_planes_problem_WCC_PW_beta()
 
-#EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 '''
 Model: ED
 The optimal value is 4475.0 # 4525.0 # 4550.0
