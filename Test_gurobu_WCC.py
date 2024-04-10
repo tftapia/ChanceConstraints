@@ -710,7 +710,6 @@ A solution lambda_n is
 ['lambda_n[0]' 'lambda_n[1]' 'lambda_n[2]']: [4.32946691e+04 1.25001805e+00 1.25001805e+00]
 '''
 
-
 if aux_test == True:
     cdf_mean  = 12
     cdf_deviation = 5
