@@ -591,8 +591,8 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    w_bar = 20
-    w_sigma = 4
+    w_bar = 600
+    w_sigma = 40
 
     # Create a new model
     model = gb.Model()
