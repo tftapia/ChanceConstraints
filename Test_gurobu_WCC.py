@@ -2,25 +2,76 @@ import numpy as np
 import gurobipy as gb
 from gurobipy import GRB
 from scipy.stats import norm
+import pandas as pd
 
 # Instruction variables
 aux_test = False
 test_conditional_negative = False
 test_conditional_positive = False
+power_system = True
 
 
 # System parameters
-node_set_index = [0,1,2]
-gen_set_index = [0,1,2]
-lines_node_index = [(0,1),(1,2),(0,2)]
-line_reactance = [2.5,2.5,2]
-line_f_max = [25,1000,1000]
-node_demand = [0,0,120]
-gen_max = [40,40,30]
-gen_cmg = [40, 45, 50]
-gen_calpha = [55, 50, 75]
-gen_cbeta = [65, 70, 95]
-gen_node = [1,2,1]
+if power_system == False:
+    node_set_index = [0,1,2]
+    gen_set_index = [0,1,2]
+    lines_node_index = [(0,1),(1,2),(0,2)]
+    line_reactance = [2.5,2.5,2]
+    line_f_max = [25,1000,1000]
+    node_demand = [0,0,120]
+    gen_max = [40,40,30]
+    gen_cmg = [40, 45, 50]
+    gen_calpha = [55, 50, 75]
+    gen_cbeta = [65, 70, 95]
+    gen_node = [1,2,1]
+else:
+    # Lines data
+    df_2 = pd.read_csv('gridDetails.csv')
+    df_2.keys()
+    zonas = np.unique(df_2[['From Zone', 'To Zone']].values)
+
+    lines_node_index = []
+    line_reactance = []
+    line_f_max = []
+    node_demand = []
+
+    for ind in df_2.index:
+        index_barra_in = np.where(zonas == df_2['From Zone'][ind])[0][0]
+        index_barra_out = np.where(zonas == df_2['To Zone'][ind])[0][0]
+        lines_node_index.append((index_barra_in,index_barra_out))
+        line_reactance.append(df_2['Reactance (per unit)'][ind])
+        line_f_max.append(df_2['Capacity (MW)'][ind])
+
+    df = pd.read_csv('generator_data.csv')
+
+    node_set_index = []
+    gen_set_index = []
+    gen_max = []
+    gen_cmg = []
+    gen_calpha = [] ## Arreglar
+    gen_cbeta = [] ## Arreglar
+    gen_node = []
+
+    # Node data
+    for ind in range(len(zonas)):
+        node_set_index.append(ind)
+        df_3 = pd.read_csv(zonas[ind]+'.csv')
+        demanda_promedio = df_3[zonas[ind]].mean()
+        node_demand.append(demanda_promedio)
+
+    # Generators data
+    for ind in df.index:
+        barra_string = df['Zone Location'][ind]
+        index_barra = np.where(zonas == barra_string)[0][0]
+        costo_marginal = df['Dispatch Cost Coefficient a ($/MWh)'][ind]
+        capacidad = df['Capacity (MW)'][ind]
+
+        gen_set_index.append(ind)
+        gen_node.append(index_barra)
+        gen_cmg.append(costo_marginal)
+        gen_calpha.append(costo_marginal)
+        gen_cbeta.append(costo_marginal)
+        gen_max.append(capacidad)
 
 wind_set_index = [0]
 wind_node = [0]
@@ -494,7 +545,7 @@ def cutting_planes_problem_WCC_PW_beta():
                 +
             truncated_normal_funtion(p_n_star[n]-gen_set_index[n] + (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))),
                                     (w_sigma*(alpha_n_star[n]+beta_n_star[n]))*np.sqrt(1 + z_auxiliar*norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))**2))
-            <= epsilon for n in range(N)):
+            <= epsilon for n in gen_set_index):
             break
 
         # Add a cutting plane to the model 

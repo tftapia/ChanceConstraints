@@ -1,15 +1,4 @@
-GenCo_Name,"Zone 
-Location","Capacity 
-(MW)",Fuel Type,"MinUp
-Time (hr)","MinDown 
-Time (hr)","Ramp Rate
-(MW/hr)","StartUp 
-Cost ($)","NoLoad
-Cost ($)","Dispatch Cost 
-Coefficient a 
-($/MWh)","Dispatch Cost 
-Coefficient b 
-($/MW^2h)"
+GenCo_Name,"Zone Location","Capacity (MW)",Fuel Type,"MinUpTime (hr)","MinDown Time (hr)","Ramp Rate (MW/hr)","StartUp Cost ($)","NoLoadCost ($)","Dispatch Cost Coefficient a ($/MWh)","Dispatch Cost Coefficient b ($/MW^2h)"
 Generator_1,NH,1244.0,NUC ,24,49,120,950000.0,1000.0,10.0,0.0002
 Generator_2,CT,1235.0, NUC ,24,48,120,850000.0,1250.0,10.0,0.00022999999999999998
 Generator_3,CT,881.0, NUC ,24,48,120,900000.0,1500.0,5.0,0.00015
