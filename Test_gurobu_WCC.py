@@ -3,12 +3,13 @@ import gurobipy as gb
 from gurobipy import GRB
 from scipy.stats import norm
 import pandas as pd
+import random
 
 # Instruction variables
 aux_test = False
 test_conditional_negative = False
 test_conditional_positive = False
-power_system = False
+power_system = True
 
 
 # System parameters
@@ -26,7 +27,7 @@ if power_system == False:
     gen_node = [1,2,1]
 else:
     # Lines data
-    df_2 = pd.read_csv('/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/gridDetails.csv')
+    df_2 = pd.read_csv('gridDetails.csv') #'/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/gridDetails.csv'
     df_2.keys()
     zonas = np.unique(df_2[['From Zone', 'To Zone']].values)
 
@@ -42,7 +43,7 @@ else:
         line_reactance.append(df_2['Reactance (per unit)'][ind])
         line_f_max.append(df_2['Capacity (MW)'][ind])
 
-    df = pd.read_csv('/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/generator_data.csv')
+    df = pd.read_csv('generator_data.csv') # '/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/generator_data.csv'
 
     node_set_index = []
     gen_set_index = []
@@ -55,8 +56,8 @@ else:
     # Node data
     for ind in range(len(zonas)):
         node_set_index.append(ind)
-        df_3 = pd.read_csv('/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/'+zonas[ind]+'.csv')
-        demanda_promedio = df_3[zonas[ind]].mean()
+        df_3 = pd.read_csv(zonas[ind]+'.csv') # '/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/'+zonas[ind]+'.csv'
+        demanda_promedio = df_3[zonas[ind]].mean() - (600/8) #this last number is the forecast for the 8 zones system
         node_demand.append(demanda_promedio)
 
     # Generators data
@@ -70,7 +71,7 @@ else:
         gen_node.append(index_barra)
         gen_cmg.append(costo_marginal)
         gen_calpha.append(costo_marginal)
-        gen_cbeta.append(costo_marginal)
+        gen_cbeta.append(costo_marginal*(1+random.random()))
         gen_max.append(capacidad)
 
 wind_set_index = [0]
@@ -170,8 +171,8 @@ def cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_in
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    #w_bar = 600
-    #w_sigma = 40
+    w_bar = 600
+    w_sigma = 40
     #w_bar = 20
     #w_sigma = 4
 
@@ -202,7 +203,7 @@ def cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_in
     cons_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Operational reserve constraint
 
     # Add cutting planes until the optimal solution satisfy the WCC constraint
-    n_iterations = 3
+    n_iterations = 100
     continue_flag = True
     for _ in range(n_iterations):
         model.optimize()
@@ -250,6 +251,16 @@ def cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_in
     print("A solution s_i is")
     for v in s_i.values():
         print("{}: {}".format(v.varName, v.X))
+
+    o_opt = obj.getValue()
+    p_opt = []
+    a_opt = []
+    for v in p_n.values():
+        p_opt.append(round(v.X,4))
+    for v in alpha_n.values():
+        a_opt.append(round(v.X,4))
+
+    return o_opt, p_opt, a_opt
     
 def cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
     flag_print = False
@@ -288,7 +299,7 @@ def cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_nod
     cons_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Operational reserve constraint
 
     # Add cutting planes until the optimal solution satisfy the WCC constraint
-    n_iterations = 1000
+    n_iterations = 100
     continue_flag = True
     for _ in range(n_iterations):
         model.optimize()
@@ -472,10 +483,10 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    w_bar = 20
-    w_sigma = 4
-    #w_bar = 600
-    #w_sigma = 40
+    #w_bar = 20
+    #w_sigma = 4
+    w_bar = 600
+    w_sigma = 40
 
     # Create a new model
     model = gb.Model()
@@ -512,7 +523,7 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
     model.optimize()
 
     # Add cutting planes until the optimal solution satisfy the WCC constraint
-    n_iterations = 1000
+    n_iterations = 10
     continue_flag = True
     for _ in range(n_iterations):
         model.optimize()
@@ -593,6 +604,19 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
     for v in s_i.values():
         print("{}: {}".format(v.varName, v.X))
 
+    o_opt = obj.getValue()
+    p_opt = []
+    a_opt = []
+    b_opt = []
+    for v in p_n.values():
+        p_opt.append(round(v.X,4))
+    for v in alpha_n.values():
+        a_opt.append(round(v.X,4))
+    for v in beta_n.values():
+        b_opt.append(round(v.X,4))
+
+    return o_opt, p_opt, a_opt, b_opt
+
 
 def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
     flag_print = False
@@ -601,10 +625,10 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    #w_bar = 600
-    #w_sigma = 40
-    w_bar = 20
-    w_sigma = 4
+    w_bar = 600
+    w_sigma = 40
+    #w_bar = 20
+    #w_sigma = 4
 
     # Create a new model
     model = gb.Model()
@@ -615,8 +639,8 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     f_ij = model.addVars(lines_node_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='fij')
     s_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS, name='s_i')
     #p_n = model.addVars(N, vtype=GRB.CONTINUOUS, name="p_n", lb=0)         # Generation variable
-    alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=0) # Operational reserve variable
-    beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=0)   # Adversarial reserve variable
+    alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
+    beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8)   # Adversarial reserve variable
 
     omega_star = model.addVar(vtype=GRB.CONTINUOUS, name="omega_star", lb=-GRB.INFINITY) # Optimal critical value from the extreme event region
     lambda_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="lambda_n", lb=-GRB.INFINITY)     # Dual variable of the constrainst to obtain "omega_star"
@@ -642,7 +666,7 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     
     cons_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Operational reserve constraint
     cons_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='cons_ad_reserve')  # Adversarial reserve constraint
-    #model.addConstrs(p_n[n] - p_n_max[n] - alpha_n[n]*inv_phi_eps*w_sigma <= 0 for n in range(N))     # Max generation limit constraint%
+    model.addConstrs(p_n[n] - gen_max[n] - alpha_n[n]*inv_phi_eps*w_sigma <= 0 for n in gen_set_index)     # Max generation limit constraint%
     
     model.addConstrs(aux_omega_a[n] == omega_star*alpha_n[n] for n in gen_set_index)
     model.addConstrs(aux_omega_b[n] == omega_star*beta_n[n] for n in gen_set_index)
@@ -651,7 +675,7 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
 
     ## LDT Constraint
     model.addConstr(w_sigma**(-0.5)*omega_star + inv_phi_ext <= 0)
-    model.addConstrs(w_sigma**(-1)*omega_star + aux_lambda_a[n] + aux_lambda_b[n] == 0 for n in gen_set_index)
+    model.addConstrs(w_sigma**(-1)*omega_star + aux_lambda_b[n] == 0 for n in gen_set_index)
     model.addConstrs(-gen_max[n] + p_n[n] - aux_omega_a[n] - aux_omega_b[n] == 0 for n in gen_set_index)
 
     ## Allow QCP dual 
@@ -675,6 +699,9 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     print("A solution beta_n is")
     for v in beta_n.values():
         print("{}: {}".format(v.varName, v.X))
+    print("A solution s_i is")    
+    for v in s_i.values():
+        print("{}: {}".format(v.varName, v.X))
     print("A solution omega_star is")
     print("{}: {}".format(omega_star.varName, omega_star.X))
     print("A solution lambda_n is")
@@ -683,6 +710,19 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     print("A solution f_ij is")
     for v in f_ij.values():
         print("{}: {}".format(v.varName, v.X))
+
+    o_opt = obj.getValue()
+    p_opt = []
+    a_opt = []
+    b_opt = []
+    for v in p_n.values():
+        p_opt.append(round(v.X,4))
+    for v in alpha_n.values():
+        a_opt.append(round(v.X,4))
+    for v in beta_n.values():
+        b_opt.append(round(v.X,4))
+
+    return o_opt, p_opt, a_opt, b_opt
 
     #print("A solution aux_omega_a is")
     #print("{}: {}".format(aux_omega_a.varName, aux_omega_a.X ))
@@ -702,13 +742,53 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     #    print("{}: {}".format(c.constrName, c.Pi))  # .QCPi is used for quadratic constraints
 
 
-#cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+o_opt1, p_opt1, a_opt1 = cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 #cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 
 ##cutting_planes_problem_WCC_PW()
-#cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+o_opt2, p_opt2, a_opt2, b_opt2 = cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 
-EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+o_opt3, p_opt3, a_opt3, b_opt3 = EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+#print(o_opt3)
+
+energy_list_1 = np.zeros(len(node_set_index))
+sreserve_list_1 = np.zeros(len(node_set_index))
+ereserve_list_1 = np.zeros(len(node_set_index))
+
+for gen in gen_set_index:
+    energy_list_1[gen_node[gen]] += p_opt1[gen]
+    sreserve_list_1[gen_node[gen]] += a_opt1[gen]
+    #ereserve_list[gen_node[gen]] = 
+
+energy_list_2 = np.zeros(len(node_set_index))
+sreserve_list_2 = np.zeros(len(node_set_index))
+ereserve_list_2 = np.zeros(len(node_set_index))
+
+for gen in gen_set_index:
+    energy_list_2[gen_node[gen]] += p_opt2[gen]
+    sreserve_list_2[gen_node[gen]] += a_opt2[gen]
+    ereserve_list_2[gen_node[gen]] += b_opt2[gen]
+
+energy_list_3 = np.zeros(len(node_set_index))
+sreserve_list_3 = np.zeros(len(node_set_index))
+ereserve_list_3 = np.zeros(len(node_set_index))
+
+for gen in gen_set_index:
+    energy_list_3[gen_node[gen]] += p_opt3[gen]
+    sreserve_list_3[gen_node[gen]] += a_opt3[gen]
+    ereserve_list_3[gen_node[gen]] += b_opt3[gen]
+
+print(energy_list_1)
+print(sreserve_list_1)
+print(ereserve_list_1)
+
+print(energy_list_2)
+print(sreserve_list_2)
+print(ereserve_list_2)
+
+print(energy_list_3)
+print(sreserve_list_3)
+print(ereserve_list_3)
 '''
 Model: ED
 The optimal value is 4475.0 # 4525.0 # 4550.0
@@ -739,6 +819,8 @@ A solution omega_star is
 A solution lambda_n is
 ['lambda_n[0]' 'lambda_n[1]' 'lambda_n[2]']: [4.32946691e+04 1.25001805e+00 1.25001805e+00]
 '''
+print(zonas)
+
 
 if aux_test == True:
     cdf_mean  = 12
