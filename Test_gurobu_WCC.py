@@ -9,11 +9,24 @@ import random
 aux_test = False
 test_conditional_negative = False
 test_conditional_positive = False
-power_system = True
+power_system = False
 
 
 # System parameters
 if power_system == False:
+    node_set_index = [0]
+    gen_set_index = [0,1,2]
+    lines_node_index = []
+    line_reactance = []
+    line_f_max = []
+    node_demand = [120]
+    gen_max = [40, 45, 50]
+    gen_cmg = [20, 30, 35]
+    gen_calpha = [75, 40, 80]
+    gen_cbeta = [210,65,80]
+    gen_node = [0,0,0]
+
+    '''
     node_set_index = [0,1,2]
     gen_set_index = [0,1,2]
     lines_node_index = [(0,1),(1,2),(0,2)]
@@ -25,6 +38,7 @@ if power_system == False:
     gen_calpha = [55, 50, 75]
     gen_cbeta = [65, 70, 95]
     gen_node = [1,2,1]
+    '''
 else:
     # Lines data
     df_2 = pd.read_csv('gridDetails.csv') #'/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/gridDetails.csv'
@@ -144,7 +158,7 @@ def truncated_normal_funtion_dmu(mu,sigma):
 def truncated_normal_funtion_dsigma(mu,sigma):
     z_aux = (-mu/sigma)
     term_1 = -((mu**2)/(sigma**2))*norm.pdf(z_aux)
-    term_2 = (1/np.sqrt(2*np.pi))*(1-((mu**2)/(sigma**2)))*np.exp((-1/2)*z_aux**2)
+    term_2 = (1/np.sqrt(2*np.pi))*(1+((mu**2)/(sigma**2)))*np.exp((-1/2)*z_aux**2)
     wcc_dsigma = term_1 + term_2
     return wcc_dsigma
 
@@ -171,10 +185,10 @@ def cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_in
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    w_bar = 600
-    w_sigma = 40
-    #w_bar = 20
-    #w_sigma = 4
+    #w_bar = 600
+    #w_sigma = 40
+    w_bar = 10
+    w_sigma = 5
 
     # Create a new model
     model = gb.Model()
@@ -269,8 +283,8 @@ def cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_nod
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    w_bar = 20
-    w_sigma = 4
+    w_bar = 10
+    w_sigma = 5
 
     # Create a new model
     model = gb.Model()
@@ -299,7 +313,7 @@ def cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_nod
     cons_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Operational reserve constraint
 
     # Add cutting planes until the optimal solution satisfy the WCC constraint
-    n_iterations = 100
+    n_iterations = 50
     continue_flag = True
     for _ in range(n_iterations):
         model.optimize()
@@ -429,7 +443,7 @@ def cutting_planes_problem_WCC_PW():
 
         # Check if solution satisfy the WCC constraint
         if all(
-            truncated_normal_funtion(p_n_star[n]-p_n_max[n] - alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)),
+            truncated_normal_funtion(p_n_star[n]-p_n_max[n] + alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)),
                                     (w_sigma*alpha_n_star[n])*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar)) - (norm.pdf(z_auxiliar)/norm.cdf(z_auxiliar))**2))
                 +
             truncated_normal_funtion(p_n_star[n]-p_n_max[n] + alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))),
@@ -483,10 +497,10 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    #w_bar = 20
-    #w_sigma = 4
-    w_bar = 600
-    w_sigma = 40
+    w_bar = 10
+    w_sigma = 5
+    #w_bar = 600
+    #w_sigma = 40
 
     # Create a new model
     model = gb.Model()
@@ -526,6 +540,8 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
     n_iterations = 10
     continue_flag = True
     for _ in range(n_iterations):
+        print("ITERATION",_)
+        model.display()
         model.optimize()
         obj_value = model.getObjective()
 
@@ -549,12 +565,12 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
             alpha_n_star[n] = model.getVarByName('alpha_n[%d]'%(n)).X
             beta_n_star[n] = model.getVarByName('beta_n[%d]'%(n)).X
 
-        w_critic = -5173.94
+        w_critic = 12.5
         z_auxiliar = w_critic/w_sigma
         # Check if solution satisfy the WCC constraint
         if all(
-            truncated_normal_funtion(p_n_star[n]-gen_set_index[n] - alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7)),
-                                    (w_sigma*alpha_n_star[n])*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7)) - (norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7))**2))
+            truncated_normal_funtion(p_n_star[n]-gen_set_index[n] + (alpha_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7)),
+                                    (w_sigma*(alpha_n_star[n]))*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7)) - (norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7))**2))
                 +
             truncated_normal_funtion(p_n_star[n]-gen_set_index[n] + (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7)),
                                     (w_sigma*(alpha_n_star[n]+beta_n_star[n]))*np.sqrt(1 + z_auxiliar*norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7))**2))
@@ -563,25 +579,27 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
 
         # Add a cutting plane to the model 
         for n in gen_set_index:
-            media_lower = p_n_star[n]-gen_set_index[n] - (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7))
-            desviacion_lower = (w_sigma*(alpha_n_star[n]+beta_n_star[n]))*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7)) - (norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7))**2)
+            media_lower = p_n_star[n]-gen_set_index[n] - (alpha_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)))
+            desviacion_lower = (w_sigma*(alpha_n_star[n]))*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar))) - (norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)))**2)
 
-            media_greater = p_n_star[n]-gen_set_index[n] + alpha_n_star[n]*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7))
-            desviacion_greater = (w_sigma*alpha_n_star[n])*np.sqrt(1 + z_auxiliar*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7))**2)
+            media_greater = p_n_star[n]-gen_set_index[n] + (alpha_n_star[n]+beta_n_star[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))
+            desviacion_greater = (w_sigma*(alpha_n_star[n]+beta_n_star[n]))*np.sqrt(1 + z_auxiliar*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)))**2)
             print('ITERATION, %s, gen, %s, z_auxiliar, %s ' %(_,n,z_auxiliar))
             print("media_d {}, sd_d {}, media_u {}, sd_u {}".format(media_lower,desviacion_lower,media_greater,desviacion_greater))
-            print("tnf_d {}, tnf_u {}, sum {}".format(truncated_normal_funtion(media_lower, desviacion_lower),truncated_normal_funtion(media_greater, desviacion_greater),
-                                                      truncated_normal_funtion(media_lower, desviacion_lower)+truncated_normal_funtion(media_greater, desviacion_greater)))
-            
+            #print("tnf_d {}, tnf_u {}, sum {}".format(truncated_normal_funtion(media_lower, desviacion_lower),truncated_normal_funtion(media_greater, desviacion_greater),
+            #                                          truncated_normal_funtion(media_lower, desviacion_lower)+truncated_normal_funtion(media_greater, desviacion_greater)))
+            #print("tnf_d_dmu {}, tnf_d_dsigma {}, tnf_d_dmu {}, tnf_u_dmsigma {}".format(truncated_normal_funtion_dmu(media_lower, desviacion_lower), truncated_normal_funtion_dsigma(media_lower, desviacion_lower) ,truncated_normal_funtion_dmu(media_greater, desviacion_greater) ,truncated_normal_funtion_dsigma(media_greater, desviacion_greater)))
+            print(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)))
+            print("tnf_l {} + tnf_u {} < {}".format(truncated_normal_funtion(media_lower, desviacion_lower),truncated_normal_funtion(media_greater, desviacion_greater),epsilon))
             if truncated_normal_funtion(media_lower, desviacion_lower) + truncated_normal_funtion(media_greater, desviacion_greater) >= epsilon:
                 print('ERROR in iterration, %s, with generador, %s' %(_,n))
                 model.addConstr(
                     truncated_normal_funtion(media_lower, desviacion_lower) 
-                    + ((p_n[n]-gen_max[n] - (alpha_n[n]+beta_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7))) - media_lower)*truncated_normal_funtion_dmu(media_lower, desviacion_lower) 
-                    + (((alpha_n[n]+beta_n[n])*w_sigma)*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7)) - (norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-7))**2) - desviacion_lower)*truncated_normal_funtion_dsigma(media_lower, desviacion_lower) 
+                    + ((p_n[n]-gen_max[n] + (alpha_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)))) - media_lower)*truncated_normal_funtion_dmu(media_lower, desviacion_lower) 
+                    + (((alpha_n[n])*w_sigma)*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-8)) - (norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-8))**2) - desviacion_lower)*truncated_normal_funtion_dsigma(media_lower, desviacion_lower) 
                     + truncated_normal_funtion(media_greater, desviacion_greater) 
-                    + ((p_n[n]-gen_max[n] + (alpha_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7)) ) - media_greater)*truncated_normal_funtion_dmu(media_greater, desviacion_greater) 
-                    + ((alpha_n[n]*w_sigma)*np.sqrt(1 + z_auxiliar*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-7))**2) - desviacion_greater)*truncated_normal_funtion_dsigma(media_greater, desviacion_greater)
+                    + ((p_n[n]-gen_max[n] + (alpha_n[n]+beta_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) ) - media_greater)*truncated_normal_funtion_dmu(media_greater, desviacion_greater) 
+                    + (((alpha_n[n]+beta_n[n])*w_sigma)*np.sqrt(1 + z_auxiliar*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-8)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-8))**2) - desviacion_greater)*truncated_normal_funtion_dsigma(media_greater, desviacion_greater)
                     <= epsilon)
         
     # Print results
@@ -617,7 +635,6 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
 
     return o_opt, p_opt, a_opt, b_opt
 
-
 def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
     flag_print = False
     #System parameters
@@ -625,10 +642,10 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    w_bar = 600
-    w_sigma = 40
-    #w_bar = 20
-    #w_sigma = 4
+    #w_bar = 600
+    #w_sigma = 40
+    w_bar = 10
+    w_sigma = 5
 
     # Create a new model
     model = gb.Model()
@@ -741,16 +758,40 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     #for c in cons_reserve.values():
     #    print("{}: {}".format(c.constrName, c.Pi))  # .QCPi is used for quadratic constraints
 
-
+print("\nCC Solve")
 o_opt1, p_opt1, a_opt1 = cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 #cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 
+
+print("\nWCC Solve")
 ##cutting_planes_problem_WCC_PW()
 o_opt2, p_opt2, a_opt2, b_opt2 = cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 
+
+print("\nLDT Solve")
 o_opt3, p_opt3, a_opt3, b_opt3 = EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 #print(o_opt3)
 
+
+print("\nCC")
+print(o_opt1)
+print(p_opt1)
+print(a_opt1)
+
+print("\nWCC")
+print(o_opt2)
+print(p_opt2)
+print(a_opt2)
+print(b_opt2)
+
+print("\nLDT")
+print(o_opt3)
+print(p_opt3)
+print(a_opt3)
+print(b_opt3)
+
+#nodes 
+'''
 energy_list_1 = np.zeros(len(node_set_index))
 sreserve_list_1 = np.zeros(len(node_set_index))
 ereserve_list_1 = np.zeros(len(node_set_index))
@@ -759,6 +800,7 @@ for gen in gen_set_index:
     energy_list_1[gen_node[gen]] += p_opt1[gen]
     sreserve_list_1[gen_node[gen]] += a_opt1[gen]
     #ereserve_list[gen_node[gen]] = 
+
 
 energy_list_2 = np.zeros(len(node_set_index))
 sreserve_list_2 = np.zeros(len(node_set_index))
@@ -777,18 +819,19 @@ for gen in gen_set_index:
     energy_list_3[gen_node[gen]] += p_opt3[gen]
     sreserve_list_3[gen_node[gen]] += a_opt3[gen]
     ereserve_list_3[gen_node[gen]] += b_opt3[gen]
+'''
 
-print(energy_list_1)
-print(sreserve_list_1)
-print(ereserve_list_1)
+#print(energy_list_1)
+#print(sreserve_list_1)
+#print(ereserve_list_1)
 
-print(energy_list_2)
-print(sreserve_list_2)
-print(ereserve_list_2)
+#print(energy_list_2)
+#print(sreserve_list_2)
+#print(ereserve_list_2)
 
-print(energy_list_3)
-print(sreserve_list_3)
-print(ereserve_list_3)
+#print(energy_list_3)
+#print(sreserve_list_3)
+#print(ereserve_list_3)
 '''
 Model: ED
 The optimal value is 4475.0 # 4525.0 # 4550.0
@@ -819,7 +862,7 @@ A solution omega_star is
 A solution lambda_n is
 ['lambda_n[0]' 'lambda_n[1]' 'lambda_n[2]']: [4.32946691e+04 1.25001805e+00 1.25001805e+00]
 '''
-print(zonas)
+#print(zonas)
 
 
 if aux_test == True:
@@ -900,3 +943,4 @@ if (test_conditional_negative == True) or  (test_conditional_positive == True):
         print("tnf_cond {}, tnf_taylor_cond {}".format(tnf_cond, tnf_taylor_cond))
 
 
+print(truncated_normal_funtion(40, 0.4) )
