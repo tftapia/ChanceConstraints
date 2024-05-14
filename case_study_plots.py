@@ -52,17 +52,19 @@ def plot_1(color_in, list_avg_scheduled, list_avg_outschedule, list_std_schedule
     plt.ylabel("Total cost [$]") 
     #plt.title("Number of Students in each group") 
     plt.legend() 
-    plt.show()
+    plt.savefig('Figure_0.pdf')
+    #plt.show()
+
 
 # Scheduled energy and reserve dispatch (simple example)
 def plot_2(color_in, list_energy, list_rreserve, list_ereserve):
     color = color_in
-    fig, ax = plt.subplots(layout='constrained', figsize=(7.5, 2.5))
+    fig, ax = plt.subplots(layout='constrained', figsize=(8, 2.5))
 
     def sum_list(list1, list2):
         return  list( map(np.add, list1, list2) )
     
-    x = ['CC', 'LDT-CC', 'LDT-WCC','CC', 'LDT-CC', 'LDT-WCC','CC', 'LDT-CC', 'LDT-WCC']
+    x = ['Energy', 'Reg. Res', 'Ext. Res','Energy', 'Reg. Res', 'Ext. Res','Energy', 'Reg. Res', 'Ext. Res']
     cc_y1 = list_energy
     cc_y2 = list_rreserve
     cc_y3 = list_ereserve
@@ -70,16 +72,16 @@ def plot_2(color_in, list_energy, list_rreserve, list_ereserve):
     X_axis = np.arange(len(x)) 
 
     # plot bars in stack manner
-    plt.bar(X_axis, cc_y1, 0.7,  color= color[0], label = "Energy")
-    plt.bar(X_axis, cc_y2, 0.7,  bottom=cc_y1, color=color[1], label = "R. Reserve")
-    plt.bar(X_axis, cc_y3, 0.7,  bottom=sum_list(cc_y1, cc_y2), color=color[2], label = "E. Reserve")
+    plt.bar(X_axis, cc_y1, 0.7,  color= color[0], label = "Gen 1")
+    plt.bar(X_axis, cc_y2, 0.7,  bottom=cc_y1, color=color[1], label = "Gen 2")
+    plt.bar(X_axis, cc_y3, 0.7,  bottom=sum_list(cc_y1, cc_y2), color=color[2], label = "Gen 3")
 
 
     # label the classes:
     plt.xticks(X_axis, x) 
-    plt.ylabel("Energy/Reserve supply [MW]") 
+    plt.ylabel("Energy/Reserve supply [%]") 
     sec = ax.secondary_xaxis(location=0)
-    sec.set_xticks([1, 4, 7], labels=['\n\nGenerator 1', '\n\nGenerator 2', '\n\nGenerator 3'])
+    sec.set_xticks([1, 4, 7], labels=['\n\nCC', '\n\nLDT-CC', '\n\nLDT-WCC'])
     sec.tick_params('x', length=0)
 
     # lines between the classes:
@@ -88,7 +90,7 @@ def plot_2(color_in, list_energy, list_rreserve, list_ereserve):
     sec2.tick_params('x', length=40, width=1)
     ax.set_xlim(-0.6, 8.6)
 
-    ax.legend(bbox_to_anchor=(1.0, 0.9))
+    ax.legend() #ax.legend(bbox_to_anchor=(1.0, 0.9))
     #plt.show()
     plt.savefig('Figure_1.pdf')
 
@@ -122,11 +124,17 @@ def plot_3(color_in, list_energy, list_rreserve, list_ereserve):
 
 
 # Simple experiment plot
-p2_energy = [0.40, 0.40, 0.398, 0.40, 0.35, 0.332, 0.20, 0.25, 0.270]
-p2_rreserve = [0, 0, 0, 0, 0.5, 1, 1, 0.5, 0]
-p2_ereserve = [0, 0, 1, 0, 0.5, 0, 0, 0.5, 0 ]
-plot_2(color_base,p2_energy,p2_rreserve,p2_ereserve)
+p2_gen1 = [40.0/105,    0.0, 0.0, 39.9995/105, 0.0 , 0.0, 40.0/105, 0.0, 0.0]
+p2_gen2 = [40.0654/105, 1.0, 0.0, 44.9983/105, 0.0, 0.0001, 36.0561/105, 1.0, 0.0]
+p2_gen3 = [24.9346/105, 0.0, 0.0, 20.0022/105, 1.0, 0.9999, 28.9439/105, 0.0, 1.0 ]
+plot_2(color_alt,p2_gen1,p2_gen2,p2_gen3)
 
 #plot_1(color_base_alt)
+
+list_avg_scheduled = [2821.845011767017,2836.167799344316,2814.9242087665275]
+list_avg_outschedule = [2914.673,2737.823539447338,2743.04753944733]
+list_std_scheduled = [105.64870117081863,102.0507600575475, 122.8322902687891]
+list_std_outschedule = [104.67687027473983,104.67687027473976,0]
+plot_1(color_base_alt, list_avg_scheduled, list_avg_outschedule, list_std_scheduled, list_std_outschedule)
 
 #plot_3(color_base)

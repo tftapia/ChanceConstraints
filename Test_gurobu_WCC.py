@@ -19,11 +19,11 @@ if power_system == False:
     lines_node_index = []
     line_reactance = []
     line_f_max = []
-    node_demand = [120]
-    gen_max = [40, 45, 50]
+    node_demand = [125]
+    gen_max = [40, 45, 55]
     gen_cmg = [20, 30, 35]
-    gen_calpha = [75, 40, 80]
-    gen_cbeta = [210,65,80]
+    gen_calpha = [65, 40, 90]
+    gen_cbeta = [210,65,90]
     gen_node = [0,0,0]
 
     '''
@@ -187,8 +187,8 @@ def cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_in
     inv_phi_ext = norm.ppf(epsilon_ext)
     #w_bar = 600
     #w_sigma = 40
-    w_bar = 10
-    w_sigma = 5
+    w_bar = 20
+    w_sigma = 3
 
     # Create a new model
     model = gb.Model()
@@ -283,8 +283,8 @@ def cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_nod
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    w_bar = 10
-    w_sigma = 5
+    w_bar = 20
+    w_sigma = 3
 
     # Create a new model
     model = gb.Model()
@@ -497,8 +497,8 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
-    w_bar = 10
-    w_sigma = 5
+    w_bar = 20
+    w_sigma = 3
     #w_bar = 600
     #w_sigma = 40
 
@@ -537,7 +537,7 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
     model.optimize()
 
     # Add cutting planes until the optimal solution satisfy the WCC constraint
-    n_iterations = 10
+    n_iterations = 25
     continue_flag = True
     for _ in range(n_iterations):
         print("ITERATION",_)
@@ -565,7 +565,7 @@ def cutting_planes_problem_WCC_PW_beta(node_set_index,gen_set_index,lines_node_i
             alpha_n_star[n] = model.getVarByName('alpha_n[%d]'%(n)).X
             beta_n_star[n] = model.getVarByName('beta_n[%d]'%(n)).X
 
-        w_critic = 12.5
+        w_critic = 17.5
         z_auxiliar = w_critic/w_sigma
         # Check if solution satisfy the WCC constraint
         if all(
@@ -644,8 +644,8 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
     inv_phi_ext = norm.ppf(epsilon_ext)
     #w_bar = 600
     #w_sigma = 40
-    w_bar = 10
-    w_sigma = 5
+    w_bar = 20
+    w_sigma = 3
 
     # Create a new model
     model = gb.Model()
@@ -760,6 +760,7 @@ def EconomicDispatch_LDT_network(node_set_index,gen_set_index,lines_node_index,n
 
 print("\nCC Solve")
 o_opt1, p_opt1, a_opt1 = cutting_planes_problem_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+b_opt1 = np.zeros(len(gen_set_index))
 #cutting_planes_problem_WCC_ED_network(node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 
 
@@ -789,6 +790,128 @@ print(o_opt3)
 print(p_opt3)
 print(a_opt3)
 print(b_opt3)
+
+
+def test_funtion(w, w_bar, p_opt,a_opt,b_opt, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
+    flag_print = False
+
+
+    # Create a new model
+    model = gb.Model()
+
+    # Create variables
+    p_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name='p_n')
+    t_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='t_i')
+    f_ij = model.addVars(lines_node_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='fij')
+    s_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS, name='s_i')
+    alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
+    beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8) # Operational reserve variable adverse
+
+    # Set objective function
+    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*9000 for i in node_set_index), GRB.MINIMIZE)
+
+    # Add constraints
+    const_demand = model.addConstrs((sum(p_n[n] + (alpha_n[n]+beta_n[n])*w[0] for n in node_gens[i]) - w[0] + w_bar
+                                 - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
+                                 + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
+                                 + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
+    const_pmax = model.addConstrs((p_n[n] <= gen_max[n] for n in gen_set_index), name='const_pmax')
+    const_f_t = model.addConstrs( (line_susceptance_matrix[i,j]*(t_i[i]-t_i[j]) == f_ij[i,j] for (i,j) in lines_node_index), name='const_f_t')
+    const_fmax = model.addConstrs( (f_ij[i,j] <= line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmax')
+    const_fmin = model.addConstrs( (f_ij[i,j] >= -line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmin')
+    const_t_0 = model.addConstr(t_i[0] == 0)
+    
+    #cons_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Operational reserve constraint
+    #cons_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Adversarial reserve constraint
+    const_pmax2 = model.addConstrs((p_n[n] <= p_opt[n] for n in gen_set_index), name='const_pmax2')
+    cons_op_reserve = model.addConstrs((alpha_n[n] <= a_opt[n] for n in gen_set_index), name='cons_op_reserve')
+    cons_ad_reserve = model.addConstrs((beta_n[n] <= b_opt[n] for n in gen_set_index), name='cons_ad_reserve')
+
+    # Constraints
+    cons_pmax = model.addConstrs((p_n[n]<= gen_max[n] for n in gen_set_index), name='cons_pmax') 
+
+    # Solve
+    model.optimize()
+
+    # Print results
+    obj = model.getObjective()
+    ## Primal solution
+    print("\nThe optimal value is", obj.getValue())
+    print("A solution p_n is")
+    for v in p_n.values():
+        print("{}: {}".format(v.varName, v.X))
+    print("A solution alpha_n is")
+    for v in alpha_n.values():
+        print("{}: {}".format(v.varName, v.X))
+    print("A solution beta_n is")
+    for v in beta_n.values():
+        print("{}: {}".format(v.varName, v.X))
+    print("A solution f_ij is")
+    for v in f_ij.values():
+        print("{}: {}".format(v.varName, v.X))
+    print("A solution s_i is")
+    for v in s_i.values():
+        print("{}: {}".format(v.varName, v.X))
+    print("A solution w is")
+    print(w[0])
+
+
+    o_opt = obj.getValue()
+    p_opt = []
+    a_opt = []
+    b_opt = []
+    for v in p_n.values():
+        p_opt.append(round(v.X,4))
+    for v in alpha_n.values():
+        a_opt.append(round(v.X,4))
+    for v in beta_n.values():
+        b_opt.append(round(v.X,4))
+
+    return o_opt, p_opt, a_opt, b_opt
+
+def test(p_opt1,a_opt1,b_opt1,p_opt2,a_opt2,b_opt2, p_opt3,a_opt3,b_opt3):
+    list_obj1_s = []; list_obj1_o = []
+    list_obj2_s = []; list_obj2_o = []
+    list_obj3_s = []; list_obj3_o = []
+    for _ in range(99):
+        w_bar = 20; w_sigma = 5
+        mu, sigma = w_bar, w_sigma 
+        w = np.random.normal(0, sigma, 1)
+        print(w)
+        print("\nTest Solve",_)
+        if w <5:
+            o_opt01, p_opt01, a_opt01, b_opt01 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+            list_obj1_s.append(o_opt01)
+            o_opt02, p_opt02, a_opt02, b_opt02 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+            list_obj2_s.append(o_opt02)
+            o_opt03, p_opt03, a_opt03, b_opt03 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+            list_obj3_s.append(o_opt03)
+        elif w>5:
+            o_opt01, p_opt01, a_opt01, b_opt01 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+            list_obj1_o.append(o_opt01)
+            o_opt02, p_opt02, a_opt02, b_opt02 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+            list_obj2_o.append(o_opt02)
+            o_opt03, p_opt03, a_opt03, b_opt03 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+            list_obj3_o.append(o_opt03)
+
+    w = [17.5]
+    print("\nTest Solve",_)
+    o_opt011, p_opt011, a_opt011, b_opt011 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+    list_obj1_o.append(o_opt011)
+    o_opt022, p_opt022, a_opt022, b_opt022 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+    list_obj2_o.append(o_opt022)
+    o_opt033, p_opt033, a_opt033, b_opt033 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+    list_obj3_o.append(o_opt033)
+
+    return list_obj1_s, list_obj1_o, list_obj2_s, list_obj2_o, list_obj3_s, list_obj3_o
+
+list_obj1_s, list_obj1_o, list_obj2_s, list_obj2_o, list_obj3_s, list_obj3_o = test(p_opt1,a_opt1,b_opt1,p_opt2,a_opt2,b_opt2, p_opt3,a_opt3,b_opt3)
+print("CC_s, mean {}, std {}".format(np.mean(list_obj1_s),np.std(list_obj1_s)))
+print("LTD_s, mean {}, std {}".format(np.mean(list_obj2_s),np.std(list_obj2_s)))
+print("WCC_s, mean {}, std {}".format(np.mean(list_obj3_s),np.std(list_obj3_s)))
+print("CC_o, mean {}, std {}".format(np.mean(list_obj1_o),np.std(list_obj1_o)))
+print("LTD_o, mean {}, std {}".format(np.mean(list_obj2_o),np.std(list_obj2_o)))
+print("WCC_o, mean {}, std {}".format(np.mean(list_obj3_o),np.std(list_obj3_o)))
 
 #nodes 
 '''
@@ -943,4 +1066,3 @@ if (test_conditional_negative == True) or  (test_conditional_positive == True):
         print("tnf_cond {}, tnf_taylor_cond {}".format(tnf_cond, tnf_taylor_cond))
 
 
-print(truncated_normal_funtion(40, 0.4) )
