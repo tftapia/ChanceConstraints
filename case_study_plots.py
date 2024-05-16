@@ -51,7 +51,7 @@ def plot_1(color_in, list_avg_scheduled, list_avg_outschedule, list_std_schedule
     #plt.xlabel("Models") 
     plt.ylabel("Total cost [$]") 
     #plt.title("Number of Students in each group") 
-    plt.legend() 
+    plt.legend(bbox_to_anchor=(0.8, 1.25), ncols=3)
     plt.savefig('Figure_0.pdf')
     #plt.show()
 
@@ -59,12 +59,12 @@ def plot_1(color_in, list_avg_scheduled, list_avg_outschedule, list_std_schedule
 # Scheduled energy and reserve dispatch (simple example)
 def plot_2(color_in, list_energy, list_rreserve, list_ereserve):
     color = color_in
-    fig, ax = plt.subplots(layout='constrained', figsize=(8, 2.5))
+    fig, ax = plt.subplots(layout='constrained', figsize=(6, 2.5))
 
     def sum_list(list1, list2):
         return  list( map(np.add, list1, list2) )
     
-    x = ['Energy', 'Reg. Res', 'Ext. Res','Energy', 'Reg. Res', 'Ext. Res','Energy', 'Reg. Res', 'Ext. Res']
+    x = ['Energy', 'Reg. Res','Energy', 'Reg. Res', 'Ext. Res','Energy', 'Reg. Res', 'Ext. Res']
     cc_y1 = list_energy
     cc_y2 = list_rreserve
     cc_y3 = list_ereserve
@@ -81,16 +81,16 @@ def plot_2(color_in, list_energy, list_rreserve, list_ereserve):
     plt.xticks(X_axis, x) 
     plt.ylabel("Energy/Reserve supply [%]") 
     sec = ax.secondary_xaxis(location=0)
-    sec.set_xticks([1, 4, 7], labels=['\n\nCC', '\n\nLDT-CC', '\n\nLDT-WCC'])
+    sec.set_xticks([0.5, 3, 6], labels=['\n\nCC', '\n\nLDT-CC', '\n\nLDT-WCC'])
     sec.tick_params('x', length=0)
 
     # lines between the classes:
     sec2 = ax.secondary_xaxis(location=0)
-    sec2.set_xticks([2.5, 5.5, 9.5], labels=[])
+    sec2.set_xticks([1.5, 4.5, 8.5], labels=[])
     sec2.tick_params('x', length=40, width=1)
-    ax.set_xlim(-0.6, 8.6)
+    ax.set_xlim(-0.6, 7.6)
 
-    ax.legend() #ax.legend(bbox_to_anchor=(1.0, 0.9))
+    ax.legend(bbox_to_anchor=(0.8, 1.25), ncols=3)
     #plt.show()
     plt.savefig('Figure_1.pdf')
 
@@ -117,24 +117,45 @@ def plot_3(color_in, list_energy, list_rreserve, list_ereserve):
     #plt.ylim(0, 105)
     plt.ylabel("Energy/Reserve supply [MW]") 
     plt.xticks(X_axis, x) 
-    plt.legend(bbox_to_anchor=(1.0, 0.9), ncols=1)
+    plt.legend(bbox_to_anchor=(1.0, 0.9), ncols=3)
     plt.tight_layout()
     plt.show()
 
+def plot_4(color_in, list_dispatch):
+    color = color_in
+    fig, ax = plt.subplots(layout='constrained', figsize=(7.5, 2.5))
+    cc_y = list_dispatch
+
+    X_axis = np.arange(len(cc_y)) 
+
+    # Creating the bar plot
+    plt.bar(X_axis, cc_y, color= color[0])
+
+    # Adding title and labels
+    plt.title('Sample Bar Plot')
+    plt.xlabel('Categories')
+    plt.ylabel('Values')
+
+    # Showing the plot
+    plt.show()
 
 
 # Simple experiment plot
-p2_gen1 = [40.0/105,    0.0, 0.0, 39.9995/105, 0.0 , 0.0, 40.0/105, 0.0, 0.0]
-p2_gen2 = [40.0654/105, 1.0, 0.0, 44.9983/105, 0.0, 0.0001, 36.0561/105, 1.0, 0.0]
-p2_gen3 = [24.9346/105, 0.0, 0.0, 20.0022/105, 1.0, 0.9999, 28.9439/105, 0.0, 1.0 ]
-plot_2(color_alt,p2_gen1,p2_gen2,p2_gen3)
+p2_gen1 = [40.0/105,    0.0, 39.9995/105, 0.0 , 0.0, 40.0/105, 0.0, 0.0]
+p2_gen2 = [40.0654/105, 1.0, 44.9983/105, 0.0, 0.0001, 36.0561/105, 1.0, 0.0]
+p2_gen3 = [24.9346/105, 0.0, 20.0022/105, 1.0, 0.9999, 28.9439/105, 0.0, 1.0 ]
+plot_2(color_base,p2_gen1,p2_gen2,p2_gen3)
 
 #plot_1(color_base_alt)
 
-list_avg_scheduled = [2821.845011767017,2836.167799344316,2814.9242087665275]
-list_avg_outschedule = [2914.673,2737.823539447338,2743.04753944733]
-list_std_scheduled = [105.64870117081863,102.0507600575475, 122.8322902687891]
-list_std_outschedule = [104.67687027473983,104.67687027473976,0]
-plot_1(color_base_alt, list_avg_scheduled, list_avg_outschedule, list_std_scheduled, list_std_outschedule)
+list_avg_scheduled   = [2914.7, 3030.07, 3024.79]
+list_avg_outschedule = [2823.815564114271,2811.852092814494,2792.2037666072124]
+list_std_scheduled   = [0,0,0]
+list_std_outschedule = [121.89072106756136,124.14879451679485, 137.60425168597146]
+plot_1(color_base, list_avg_scheduled, list_avg_outschedule, list_std_scheduled, list_std_outschedule)
 
-#plot_3(color_base)
+
+p4_en = [1243.9436, 1234.8398, 880.8694, 684.6583, 620.1412, 611.8285, 140.2216, 2.6347, 243.8302, 243.3293, 149.7404, 144.3339, 81.9404, 79.9404, 47.8397, 47.4397, 0.0, 57.8858, 0.0001, 0.0, 0.0, 0.0, 0.0, 400.1152, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0001, 0.0001, 693.7383, 685.2374, 675.4486, 319.7813, 0.0047, 507.9383, 490.3384, 0.0001, 0.0047, 0.0001, 248.4675, 247.5662, 247.5687, 244.8181, 244.7483, 0.0001, 238.2297, 0.0001, 147.1062, 0.0001, 0.0001, 0.0001, 0.0001, 141.0485, 0.0002, 104.8484, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+p4_rr = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0002, 0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1074, 0.0907, 0.0007, 0.0805, 0.0002, 0.0781, 0.0002, 0.0, 0.0724, 0.0411, 0.0299, 0.023, 0.0002, 0.0203, 0.001, 0.0, 0.0, 0.0, 0.0002, 0.0003, 0.0, 0.0, 0.0003, 0.0003, 0.0002, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0002, 0.0, 0.0033, 0.0002, 0.0002, 0.0002, 0.0002, 0.0004, 0.0, 0.0002, 0.0, 0.0004, 0.0012, 0.0003, 0.0004, 0.0003, 0.0498, 0.0544, 0.0587, 0.0403, 0.0264, 0.0315, 0.0315, 0.0149, 0.0095, 0.0269, 0.036, 0.027, 0.016, 0.0223]
+p4_rr = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0422, 0.0674, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0023, 0.0008, 0.1003, 0.0014, 0.0792, 0.0006, 0.0742, 0.0, 0.0006, 0.002, 0.0008, 0.0008, 0.0212, 0.0008, 0.0138, 0.0, 0.0, 0.0, 0.0428, 0.0939, 0.0, 0.0, 0.0816, 0.0492, 0.0482, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0434, 0.0, 0.0399, 0.001, 0.027, 0.027, 0.027, 0.0269, 0.0, 0.0256, 0.0, 0.0186, 0.0068, 0.0076, 0.0076, 0.0075, 0.0004, 0.0004, 0.0007, 0.0008, 0.001, 0.0005, 0.0005, 0.0007, 0.0005, 0.0005, 0.0005, 0.0004, 0.0023, 0.0005]
+plot_4(color_base,p4_rr)
