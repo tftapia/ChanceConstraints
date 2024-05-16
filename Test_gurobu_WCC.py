@@ -9,7 +9,7 @@ import random
 aux_test = False
 test_conditional_negative = False
 test_conditional_positive = False
-power_system = True
+power_system = False
 
 
 # System parameters
@@ -584,8 +584,7 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
             p_n_star[n] = model.getVarByName('p_n[%d]'%(n)).X
             alpha_n_star[n] = model.getVarByName('alpha_n[%d]'%(n)).X
             beta_n_star[n] = model.getVarByName('beta_n[%d]'%(n)).X
-
-        
+  
         z_auxiliar = w_critic/w_sigma
         # Check if solution satisfy the WCC constraint
         if all(
@@ -660,7 +659,7 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
 
     return o_opt, p_opt, a_opt, b_opt
 
-def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
+def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):#
     flag_print = False
     #System parameters
     epsilon = 0.05
@@ -719,9 +718,9 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
     model.addConstrs(aux_lambda_b[n] == lambda_n[n]*beta_n[n] for n in gen_set_index)
 
     ## LDT Constraint
-    model.addConstr(w_sigma**(-0.5)*omega_star + inv_phi_ext <= 0)
-    model.addConstrs(w_sigma**(-1)*omega_star + aux_lambda_b[n] == 0 for n in gen_set_index)
-    model.addConstrs(-gen_max[n] + p_n[n] - aux_omega_a[n] - aux_omega_b[n] == 0 for n in gen_set_index)
+    model.addConstr(-w_sigma**(-0.5)*omega_star - inv_phi_ext <= 0)
+    model.addConstrs(w_sigma**(-1)*omega_star - aux_lambda_a[n] - aux_lambda_b[n] == 0 for n in gen_set_index)
+    model.addConstrs(-gen_max[n] + p_n[n] + aux_omega_a[n] + aux_omega_b[n] == 0 for n in gen_set_index)
 
     ## Allow QCP dual 
     model.Params.QCPDual = 1
@@ -771,7 +770,7 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
         b_opt.append(round(v.X,4))
     for v in lambda_n.values():
         l_opt.append(round(v.X,4))
-        
+    print(w_sigma**(-0.5)*omega_star.X,inv_phi_ext)
     return o_opt, p_opt, a_opt, b_opt, w_opt, l_opt 
 
     #print("A solution aux_omega_a is")
@@ -794,10 +793,10 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
 # SOLVE MODELS
 
 print("\nCC Solve")
-o_opt1, p_opt1, a_opt1 = cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-b_opt1 = np.zeros(len(gen_set_index))
+#o_opt1, p_opt1, a_opt1 = cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+#b_opt1 = np.zeros(len(gen_set_index))
 print("\nWCC Solve")
-o_opt2, p_opt2, a_opt2, b_opt2 = cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+#o_opt2, p_opt2, a_opt2, b_opt2 = cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 print("\nLDT Solve")
 o_opt3, p_opt3, a_opt3, b_opt3 , w_opt3, l_opt3= EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
 
@@ -932,7 +931,7 @@ def EconomicDispatch_LDT_network_price(power_system,node_set_index,gen_set_index
 
 
 # PRINT SOLUTIONS
-
+'''
 print("\nCC")
 print(o_opt1)
 print(p_opt1)
@@ -951,7 +950,7 @@ print(p_opt3)
 print(a_opt3)
 print(b_opt3)
 print(b_opt2)
-
+'''
 
 # TEST SCENARIOS
 
