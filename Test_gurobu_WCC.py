@@ -5,40 +5,34 @@ from scipy.stats import norm
 import pandas as pd
 import random
 
-# Instruction variables
+# Test variables
 aux_test = False
 test_conditional_negative = False
 test_conditional_positive = False
-power_system = False
 
+# Code flags
+power_system = True
+flag_solve = True
+flag_test = False
+flag_test_Network = False
 
 # System parameters
 if power_system == False:
-    node_set_index = [0]
-    gen_set_index = [0,1,2]
+    node_set_index = [0] #[0]
+    gen_set_index = [0,1,2] #[0,1,2]
     lines_node_index = []
     line_reactance = []
     line_f_max = []
-    node_demand = [125]
-    gen_max = [40, 45, 55]
-    gen_cmg = [20, 30, 35]
-    gen_calpha = [65, 40, 90]
-    gen_cbeta = [210,65,90]
-    gen_node = [0,0,0]
-
-    '''
-    node_set_index = [0,1,2]
-    gen_set_index = [0,1,2]
-    lines_node_index = [(0,1),(1,2),(0,2)]
-    line_reactance = [2.5,2.5,2]
-    line_f_max = [25,1000,1000]
-    node_demand = [0,0,120]
-    gen_max = [40,40,30]
-    gen_cmg = [40, 45, 50]
-    gen_calpha = [55, 50, 75]
-    gen_cbeta = [65, 70, 95]
-    gen_node = [1,2,1]
-    '''
+    node_demand = [155] #[125]
+    gen_max = [40, 45, 55] #[40, 45, 55]
+    gen_cmg = [25, 30, 35] #[20, 30, 35]
+    gen_cmg_b = [0.001, 0.003, 0.005] #[20, 30, 35]
+    gen_calpha = [55, 40, 90] #[65, 40, 90]
+    gen_cbeta = [100, 55, 120] #[210,65,90]
+    gen_node = [0,0,0] #[0,0,0]
+    wind_set_index = [0] #[0]
+    wind_node = [0] #[0]
+    wind_factor = [1] #[1]
 else:
     # Lines data
     df_2 = pd.read_csv('gridDetails.csv') #'/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/gridDetails.csv'
@@ -49,6 +43,10 @@ else:
     line_reactance = []
     line_f_max = []
     node_demand = []
+
+    wind_set_index = []
+    wind_node = []
+    wind_factor = []
 
     for ind in df_2.index:
         index_barra_in = np.where(zonas == df_2['From Zone'][ind])[0][0]
@@ -63,6 +61,7 @@ else:
     gen_set_index = []
     gen_max = []
     gen_cmg = []
+    gen_cmg_b = []
     gen_calpha = [] ## Arreglar
     gen_cbeta = [] ## Arreglar
     gen_node = []
@@ -71,7 +70,7 @@ else:
     for ind in range(len(zonas)):
         node_set_index.append(ind)
         df_3 = pd.read_csv(zonas[ind]+'.csv') # '/Users/tftapia/Codes/ChanceConstraints/ChanceConstraints-1/'+zonas[ind]+'.csv'
-        demanda_promedio = df_3[zonas[ind]].mean() - (600/8) #this last number is the forecast for the 8 zones system
+        demanda_promedio = df_3[zonas[ind]].mean() #the last number is the forecast for the 8 zones system
         node_demand.append(demanda_promedio)
 
     # Generators data
@@ -79,17 +78,22 @@ else:
         barra_string = df['Zone Location'][ind]
         index_barra = np.where(zonas == barra_string)[0][0]
         costo_marginal = df['Dispatch Cost Coefficient a ($/MWh)'][ind]
-        capacidad = df['Capacity (MW)'][ind]
+        costo_marginal_2 = df['Dispatch Cost Coefficient b ($/MW^2h)'][ind]
+        capacidad = df['Capacity (MW)'][ind]*0.72
 
         gen_set_index.append(ind)
         gen_node.append(index_barra)
         gen_cmg.append(costo_marginal)
-        gen_calpha.append(costo_marginal)
-        gen_cbeta.append(costo_marginal*(1+random.random()))
+        gen_cmg_b.append(costo_marginal_2)
+        gen_calpha.append(costo_marginal*1.3)
+        gen_cbeta.append(costo_marginal*2)
         gen_max.append(capacidad)
 
-wind_set_index = [0]
-wind_node = [0]
+    for ind in range(len(zonas)): #create a wind generator in each zone
+        wind_set_index.append(ind)
+        wind_node.append(ind)
+        wind_factor.append(node_demand[ind]/sum(node_demand))
+        #wind_factor.append(1/len(zonas))
 
 # Set gen parameters in matrices
 node_gens = []
@@ -132,7 +136,6 @@ for n in node_set_index:
             aux_list_out.append([i,j])
     lines_node_in.append(aux_list_in)
     lines_node_out.append(aux_list_out)
-
 
 # Normal density function
 def pdf_function(x):
@@ -180,20 +183,20 @@ def taylor_approximation(mu,sigma,a,b):
 
 # MODELS
 
-def cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
+def cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
     flag_print = False
-    #System parameters
+    #System parametrs
     epsilon = 0.05
     inv_phi_eps = norm.ppf(1-epsilon)
     epsilon_ext = 0.05
     inv_phi_ext = norm.ppf(epsilon_ext)
 
     if power_system:
-        w_bar = 600
-        w_sigma = 40
+        w_bar = 3700
+        w_sigma = 1000 
     else:
-        w_bar = 20
-        w_sigma = 5
+        w_bar = 40 #20 #50
+        w_sigma = 10 #5 #12.5
 
     # Create a new model
     model = gb.Model()
@@ -206,24 +209,25 @@ def cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,
     alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=0) # Operational reserve variable
 
     # Set objective function
-    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
+    obj_value = model.setObjective(sum(p_n[n]*gen_cmg[n] + p_n[n]**2*gen_cmg_b[n] + gen_calpha[n]*alpha_n[n] for n in gen_set_index) + sum(s_i[i]*100000 for i in node_set_index), GRB.MINIMIZE)
 
     # Add constraints
-    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar for n in node_wind[i])
+    #for i in node_set_index:
+    #    print("wind {}, demand {}".format(sum(w_bar*wind_factor[n] for n in node_wind[i]), node_demand[i]))
+    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar*wind_factor[n] for n in node_wind[i])
                                  - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
                                  + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
                                  + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
     const_pmax = model.addConstrs((p_n[n] <= gen_max[n] for n in gen_set_index), name='const_pmax')
-    const_f_t = model.addConstrs( (line_susceptance_matrix[i,j]*(t_i[i]-t_i[j]) == f_ij[i,j] for (i,j) in lines_node_index), name='const_f_t')
-    const_fmax = model.addConstrs( (f_ij[i,j] <= line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmax')
-    const_fmin = model.addConstrs( (f_ij[i,j] >= -line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmin')
+    const_f_t = model.addConstrs((line_susceptance_matrix[i,j]*(t_i[i]-t_i[j]) == f_ij[i,j] for (i,j) in lines_node_index), name='const_f_t')
+    const_fmax = model.addConstrs((f_ij[i,j] <= line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmax')
+    const_fmin = model.addConstrs((f_ij[i,j] >= -line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmin')
     const_t_0 = model.addConstr(t_i[0] == 0)
     
     const_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='const_op_reserve') # Operational reserve constraint
-
+  
     # Add cutting planes until the optimal solution satisfy the WCC constraint
     n_iterations = 100
-    continue_flag = True
     for _ in range(n_iterations):
         model.optimize()
         obj_value = model.getObjective()
@@ -270,22 +274,28 @@ def cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,
     print("A solution s_i is")
     for v in s_i.values():
         print("{}: {}".format(v.varName, v.X))
-
-    o_opt = obj.getValue()
-    p_opt = []
-    a_opt = []
-    for v in p_n.values():
-        p_opt.append(round(v.X,4))
-    for v in alpha_n.values():
-        a_opt.append(round(v.X,4))
-        
+    # Dual results
     for c in const_demand.values():
         print(c.constrName, c.Pi)
     print(const_op_reserve.constrName, const_op_reserve.Pi)
 
-    return o_opt, p_opt, a_opt
+    o_opt = obj.getValue()
+    p_opt = []
+    a_opt = []
+    p_price = []
+    a_price = const_op_reserve.Pi
+
+    for v in p_n.values():
+        p_opt.append(round(v.X,4))
+    for v in alpha_n.values():
+        a_opt.append(round(v.X,4))
+    for c in const_demand.values():
+        p_price .append(round(c.Pi,4))
+
+
+    return o_opt, p_opt, a_opt, p_price, a_price
     
-def cutting_planes_problem_WCC_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
+def cutting_planes_problem_WCC_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
     flag_print = False
     #System parameters
     epsilon = 0.05
@@ -315,7 +325,7 @@ def cutting_planes_problem_WCC_ED_network(power_system,node_set_index,gen_set_in
     obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
 
     # Add constraints
-    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar for n in node_wind[i])
+    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar*wind_factor[n] for n in node_wind[i])
                                  - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
                                  + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
                                  + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
@@ -505,7 +515,7 @@ def cutting_planes_problem_WCC_PW():
     print("A solution alpha_n is")
     print("{}: {}".format(alpha_n.varName, alpha_n.X))
 
-def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
+def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
     flag_print = False
     #System parameters
     epsilon = 0.05
@@ -514,13 +524,13 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
     inv_phi_ext = norm.ppf(epsilon_ext)
 
     if power_system:
-        w_bar = 600
-        w_sigma = 40
-        w_critic = 5474
+        w_bar = 3700
+        w_sigma = 1000
+        w_critic = 3489.89
     else:
-        w_bar = 20
-        w_sigma = 5
-        w_critic = 17.5
+        w_bar = 40 # 20 #50
+        w_sigma = 10 # 5 # 12.5
+        w_critic = 12.5 # 17.5 # 32.5 
 
     # Create a new model
     model = gb.Model()
@@ -534,10 +544,10 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
     beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8) # Operational reserve variable adverse
 
     # Set objective function
-    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
+    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + p_n[n]**2*gen_cmg_b[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
 
     # Add constraints
-    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar for n in node_wind[i])
+    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar*wind_factor[n] for n in node_wind[i])
                                  - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
                                  + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
                                  + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
@@ -548,7 +558,8 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
     const_t_0 = model.addConstr(t_i[0] == 0)
     
     const_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='const_op_reserve') # Operational reserve constraint
-    const_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='const_op_reserve') # Adversarial reserve constraint
+    const_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='const_ad_reserve') # Adversarial reserve constraint
+    #model.addConstrs(p_n[n] - gen_max[n] + alpha_n[n]*inv_phi_eps*w_sigma <= 0 for n in gen_set_index)     # Max generation limit constraint%
 
     # Constraints
     cons_pmax = model.addConstrs((p_n[n]<= gen_max[n] for n in gen_set_index), name='cons_pmax') 
@@ -561,7 +572,7 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
     continue_flag = True
     for _ in range(n_iterations):
         print("ITERATION",_)
-        model.display()
+        #model.display()
         model.optimize()
         obj_value = model.getObjective()
 
@@ -616,8 +627,8 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
                     truncated_normal_funtion(media_lower, desviacion_lower) 
                     + ((p_n[n]-gen_max[n] + (alpha_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)))) - media_lower)*truncated_normal_funtion_dmu(media_lower, desviacion_lower) 
                     + (((alpha_n[n])*w_sigma)*np.sqrt(1 - z_auxiliar*(norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-8)) - (norm.pdf(z_auxiliar)/(norm.cdf(z_auxiliar)+1e-8))**2) - desviacion_lower)*truncated_normal_funtion_dsigma(media_lower, desviacion_lower) 
-                    + truncated_normal_funtion(media_greater, desviacion_greater) 
-                    + ((p_n[n]-gen_max[n] + (alpha_n[n]+beta_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) ) - media_greater)*truncated_normal_funtion_dmu(media_greater, desviacion_greater) 
+                    + truncated_normal_funtion(media_greater, desviacion_greater)
+                    + ((p_n[n]-gen_max[n] + (alpha_n[n]+beta_n[n])*w_sigma*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar))) ) - media_greater)*truncated_normal_funtion_dmu(media_greater, desviacion_greater)
                     + (((alpha_n[n]+beta_n[n])*w_sigma)*np.sqrt(1 + z_auxiliar*(norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-8)) - (norm.pdf(z_auxiliar)/(1-norm.cdf(z_auxiliar)+1e-8))**2) - desviacion_greater)*truncated_normal_funtion_dsigma(media_greater, desviacion_greater)
                     <= epsilon)
         
@@ -640,26 +651,32 @@ def cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index
     print("A solution s_i is")
     for v in s_i.values():
         print("{}: {}".format(v.varName, v.X))
+    # Dual results
+    for c in const_demand.values():
+        print(c.constrName, c.Pi)
+    print(const_op_reserve.constrName, const_op_reserve.Pi)
+    print(const_ad_reserve.constrName, const_ad_reserve.Pi)
+
 
     o_opt = obj.getValue()
     p_opt = []
     a_opt = []
     b_opt = []
+    p_price = []
+    a_price = const_op_reserve.Pi
+    b_price = const_ad_reserve.Pi
     for v in p_n.values():
         p_opt.append(round(v.X,4))
     for v in alpha_n.values():
         a_opt.append(round(v.X,4))
     for v in beta_n.values():
         b_opt.append(round(v.X,4))
-
     for c in const_demand.values():
-        print(c.constrName, c.Pi)
-    print(const_op_reserve.constrName, const_op_reserve.Pi)
-    print(const_ad_reserve.constrName, const_ad_reserve.Pi)
+        p_price .append(round(c.Pi,4))
 
-    return o_opt, p_opt, a_opt, b_opt
+    return o_opt, p_opt, a_opt, b_opt, p_price, a_price , b_price 
 
-def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):#
+def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):#
     flag_print = False
     #System parameters
     epsilon = 0.05
@@ -668,11 +685,11 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
     inv_phi_ext = norm.ppf(epsilon_ext)
 
     if power_system:
-        w_bar = 600
-        w_sigma = 40
+        w_bar = 3700
+        w_sigma = 1000
     else:
-        w_bar = 20
-        w_sigma = 5
+        w_bar = 40 #20 # 50 
+        w_sigma = 10 #5 # 12.5
 
     # Create a new model
     model = gb.Model()
@@ -682,7 +699,7 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
     t_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='t_i')
     f_ij = model.addVars(lines_node_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='fij')
     s_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS, name='s_i')
-    #p_n = model.addVars(N, vtype=GRB.CONTINUOUS, name="p_n", lb=0)         # Generation variable
+
     alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
     beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8)   # Adversarial reserve variable
 
@@ -695,10 +712,10 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
     aux_lambda_b = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_lambda_b", lb=-GRB.INFINITY) # Auxilar value to represent the negative value of "lambda_n*(alpha_n +beta_n)" in the SOC
     
     # Set objective function
-    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
+    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + p_n[n]**2*gen_cmg_b[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*100000 for i in node_set_index), GRB.MINIMIZE)
 
     # Add constraints
-    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar for n in node_wind[i])
+    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar*wind_factor[n] for n in node_wind[i])
                                  - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
                                  + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
                                  + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
@@ -710,7 +727,7 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
     
     cons_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='cons_op_reserve') # Operational reserve constraint
     cons_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='cons_ad_reserve')  # Adversarial reserve constraint
-    model.addConstrs(p_n[n] - gen_max[n] - alpha_n[n]*inv_phi_eps*w_sigma <= 0 for n in gen_set_index)     # Max generation limit constraint%
+    model.addConstrs(p_n[n] - gen_max[n] + alpha_n[n]*inv_phi_eps*w_sigma <= 0 for n in gen_set_index)     # Max generation limit constraint%
     
     model.addConstrs(aux_omega_a[n] == omega_star*alpha_n[n] for n in gen_set_index)
     model.addConstrs(aux_omega_b[n] == omega_star*beta_n[n] for n in gen_set_index)
@@ -770,7 +787,7 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
         b_opt.append(round(v.X,4))
     for v in lambda_n.values():
         l_opt.append(round(v.X,4))
-    print(w_sigma**(-0.5)*omega_star.X,inv_phi_ext)
+
     return o_opt, p_opt, a_opt, b_opt, w_opt, l_opt 
 
     #print("A solution aux_omega_a is")
@@ -791,175 +808,215 @@ def EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines
     #    print("{}: {}".format(c.constrName, c.Pi))  # .QCPi is used for quadratic constraints
 
 # SOLVE MODELS
+if flag_solve:
+    print("\nCC Solve")
+    o_opt1, p_opt1, a_opt1, p_price1, a_price1= cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+    b_opt1 = np.zeros(len(gen_set_index))
+    print("\nWCC Solve")
+    o_opt2, p_opt2, a_opt2, b_opt2, p_price2, a_price2, b_price2 = cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+    print("\nLDT Solve")
+    o_opt3, p_opt3, a_opt3, b_opt3 , w_opt3, l_opt3= EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+    print(w_opt3, l_opt3)
 
-print("\nCC Solve")
-#o_opt1, p_opt1, a_opt1 = cutting_planes_problem_ED_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-#b_opt1 = np.zeros(len(gen_set_index))
-print("\nWCC Solve")
-#o_opt2, p_opt2, a_opt2, b_opt2 = cutting_planes_problem_WCC_PW_beta(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-print("\nLDT Solve")
-o_opt3, p_opt3, a_opt3, b_opt3 , w_opt3, l_opt3= EconomicDispatch_LDT_network(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
+    def EconomicDispatch_LDT_network_price(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_opt, l_opt):
+        flag_print = False
+        #System parameters
+        epsilon = 0.05
+        inv_phi_eps = norm.ppf(1-epsilon)
+        epsilon_ext = 0.05
+        inv_phi_ext = norm.ppf(epsilon_ext)
 
-def EconomicDispatch_LDT_network_price(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_opt, l_opt):
-    flag_print = False
-    #System parameters
-    epsilon = 0.05
-    inv_phi_eps = norm.ppf(1-epsilon)
-    epsilon_ext = 0.05
-    inv_phi_ext = norm.ppf(epsilon_ext)
+        if power_system:
+            w_bar = 3700
+            w_sigma = 1000
+        else:
+            w_bar = 40 #20
+            w_sigma = 10 #5
+
+        # Create a new model
+        model = gb.Model()
+
+        # Create variables
+        p_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name='p_n')
+        t_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='t_i')
+        f_ij = model.addVars(lines_node_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='fij')
+        s_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS, name='s_i')
+        alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
+        beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8)   # Adversarial reserve variable
+
+        aux_omega_a = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_omega_a", lb=-GRB.INFINITY)   # Auxilar value to represent the positive value of "omega_star*(alpha_n +beta_n)" in the SOC
+        aux_omega_b = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_omega_b", lb=-GRB.INFINITY)   # Auxilar value to represent the negative value of "omega_star*(alpha_n +beta_n)" in the SOC
+        aux_lambda_a = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_lambda_a", lb=-GRB.INFINITY) # Auxilar value to represent the positive value of "lambda_n*(alpha_n +beta_n)" in the SOC
+        aux_lambda_b = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_lambda_b", lb=-GRB.INFINITY) # Auxilar value to represent the negative value of "lambda_n*(alpha_n +beta_n)" in the SOC
+        
+        # Set objective function
+        obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + p_n[n]**2*gen_cmg_b[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
+
+        # Add constraints
+        const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar*wind_factor[n] for n in node_wind[i])
+                                    - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
+                                    + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
+                                    + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
+        const_pmax = model.addConstrs((p_n[n] <= gen_max[n] for n in gen_set_index), name='const_pmax')
+        const_f_t = model.addConstrs( (line_susceptance_matrix[i,j]*(t_i[i]-t_i[j]) == f_ij[i,j] for (i,j) in lines_node_index), name='const_f_t')
+        const_fmax = model.addConstrs( (f_ij[i,j] <= line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmax')
+        const_fmin = model.addConstrs( (f_ij[i,j] >= -line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmin')
+        const_t_0 = model.addConstr(t_i[0] == 0)
+        
+        const_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='const_op_reserve') # Operational reserve constraint
+        const_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='const_ad_reserve')  # Adversarial reserve constraint
+        model.addConstrs(p_n[n] - gen_max[n] + alpha_n[n]*inv_phi_eps*w_sigma <= 0 for n in gen_set_index)     # Max generation limit constraint%
+        
+        model.addConstrs(aux_lambda_a[n] == l_opt[n]*alpha_n[n] for n in gen_set_index)
+        model.addConstrs(aux_lambda_b[n] == l_opt[n]*beta_n[n] for n in gen_set_index)
+        model.addConstrs(aux_omega_a[n] == w_opt*alpha_n[n] for n in gen_set_index)
+        model.addConstrs(aux_omega_b[n] == w_opt*beta_n[n] for n in gen_set_index)
+
+        ## LDT Constrain
+        model.addConstrs(-gen_max[n] + p_n[n] + aux_omega_a[n] + aux_omega_b[n] <= 0.0001 for n in gen_set_index) # relaxed to obtain the prices
+
+        ## Allow QCP dual 
+        model.setParam('MIPGap', 0.01)
+        model.setParam('Timelimit', 600)
+        # Solve
+        model.optimize()
+
+        # Print results
+        obj = model.getObjective()
+        ## Primal solution
+        print("\nThe optimal value is", obj.getValue())
+        print("A solution p_n is")
+        for v in p_n.values():
+            print("{}: {}".format(v.varName, v.X))
+        print("A solution alpha_n is")
+        for v in alpha_n.values():
+            print("{}: {}".format(v.varName, v.X))
+        print("A solution beta_n is")
+        for v in beta_n.values():
+            print("{}: {}".format(v.varName, v.X))
+        print("A solution s_i is")    
+        for v in s_i.values():
+            print("{}: {}".format(v.varName, v.X))
+        print("A solution f_ij is")
+        for v in f_ij.values():
+            print("{}: {}".format(v.varName, v.X))
+        for c in const_demand.values():
+            print(c.constrName, c.Pi)
+        print(const_op_reserve.constrName, const_op_reserve.Pi)
+        print(const_ad_reserve.constrName, const_ad_reserve.Pi)
+
+        o_opt = obj.getValue()
+        p_opt = []
+        a_opt = []
+        b_opt = []
+        p_price = []
+        a_price = const_op_reserve.Pi
+        b_price = const_ad_reserve.Pi
+
+        for v in p_n.values():
+            p_opt.append(round(v.X,4))
+        for v in alpha_n.values():
+            a_opt.append(round(v.X,4))
+        for v in beta_n.values():
+            b_opt.append(round(v.X,4))
+        for c in const_demand.values():
+            p_price .append(round(c.Pi,4))
+
+        return o_opt, p_opt, a_opt, b_opt, p_price, a_price , b_price 
+
+
+        #for v in p_n.values():
+        #    print("{}: {}".format(v.varName, v.X))
+        #for c in cons_reserve.values():
+        #    print("{}: {}".format(c.constrName, c.Pi))  # .QCPi is used for quadratic constraints
+
+        return o_opt, p_opt, a_opt, b_opt, w_opt, l_opt 
+
+    print("\nLDT Solve price")
+    o_opt3p, p_opt3p, a_opt3p, b_opt3p, p_price3, a_price3, b_price3 = EconomicDispatch_LDT_network_price(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg, gen_cmg_b,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_opt3, l_opt3)
+
+    # PRINT SOLUTIONS
+    print("\nCC")
+    print(o_opt1)
+    print(p_opt1)
+    print(a_opt1)
+    print(b_opt1)
+    print(p_price1, a_price1)
+
+    print("\nWCC")
+    print(o_opt2)
+    print(p_opt2)
+    print(a_opt2)
+    print(b_opt2)
+    print(p_price2, a_price2, b_price2)
+
+    print("\nLDT")
+    print(o_opt3, o_opt3p)
+    print(w_opt3, l_opt3)
+    print(p_opt3, p_opt3p)
+    print(a_opt3, a_opt3p)
+    print(b_opt3, b_opt3p)
+    print(p_price3, a_price3, b_price3)
 
     if power_system:
-        w_bar = 600
-        w_sigma = 40
-    else:
-        w_bar = 20
-        w_sigma = 5
+        #convert into a zone info
+        energy_list_1 = np.zeros(len(node_set_index))
+        sreserve_list_1 = np.zeros(len(node_set_index))
 
-    # Create a new model
-    model = gb.Model()
+        for gen in gen_set_index:
+            energy_list_1[gen_node[gen]] += p_opt1[gen]
+            sreserve_list_1[gen_node[gen]] += a_opt1[gen]
 
-    # Create variables
-    p_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name='p_n')
-    t_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='t_i')
-    f_ij = model.addVars(lines_node_index, vtype=GRB.CONTINUOUS,lb=-GRB.INFINITY, name='fij')
-    s_i = model.addVars(node_set_index, vtype=GRB.CONTINUOUS, name='s_i')
-    alpha_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="alpha_n", lb=1e-8) # Operational reserve variable
-    beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8)   # Adversarial reserve variable
+        #convert into a zone info
+        energy_list_2 = np.zeros(len(node_set_index))
+        sreserve_list_2 = np.zeros(len(node_set_index))
+        ereserve_list_2 = np.zeros(len(node_set_index))
 
-    omega_star = model.addVar(vtype=GRB.CONTINUOUS, name="omega_star", lb=-GRB.INFINITY) # Optimal critical value from the extreme event region
-    lambda_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="lambda_n", lb=-GRB.INFINITY)     # Dual variable of the constrainst to obtain "omega_star"
+        for gen in gen_set_index:
+            energy_list_2[gen_node[gen]] += p_opt2[gen]
+            sreserve_list_2[gen_node[gen]] += a_opt2[gen]
+            ereserve_list_2[gen_node[gen]] += b_opt2[gen]
 
-    aux_omega_a = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_omega_a", lb=-GRB.INFINITY)   # Auxilar value to represent the positive value of "omega_star*(alpha_n +beta_n)" in the SOC
-    aux_omega_b = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_omega_b", lb=-GRB.INFINITY)   # Auxilar value to represent the negative value of "omega_star*(alpha_n +beta_n)" in the SOC
-    aux_lambda_a = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_lambda_a", lb=-GRB.INFINITY) # Auxilar value to represent the positive value of "lambda_n*(alpha_n +beta_n)" in the SOC
-    aux_lambda_b = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name= "aux_lambda_b", lb=-GRB.INFINITY) # Auxilar value to represent the negative value of "lambda_n*(alpha_n +beta_n)" in the SOC
-    
-    # Set objective function
-    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*1000000 for i in node_set_index), GRB.MINIMIZE)
+        #convert into a zone info
+        energy_list_3 = np.zeros(len(node_set_index))
+        sreserve_list_3 = np.zeros(len(node_set_index))
+        ereserve_list_3 = np.zeros(len(node_set_index))
 
-    # Add constraints
-    const_demand = model.addConstrs((sum(p_n[n] for n in node_gens[i]) + sum(w_bar for n in node_wind[i])
-                                 - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
-                                 + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
-                                 + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
-    const_pmax = model.addConstrs((p_n[n] <= gen_max[n] for n in gen_set_index), name='const_pmax')
-    const_f_t = model.addConstrs( (line_susceptance_matrix[i,j]*(t_i[i]-t_i[j]) == f_ij[i,j] for (i,j) in lines_node_index), name='const_f_t')
-    const_fmax = model.addConstrs( (f_ij[i,j] <= line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmax')
-    const_fmin = model.addConstrs( (f_ij[i,j] >= -line_f_max_matrix[i,j] for (i,j) in lines_node_index), name='const_fmin')
-    const_t_0 = model.addConstr(t_i[0] == 0)
-    
-    const_op_reserve = model.addConstr(sum(alpha_n[n] for n in gen_set_index) == 1, name='const_op_reserve') # Operational reserve constraint
-    const_ad_reserve = model.addConstr(sum(beta_n[n] for n in gen_set_index) == 1, name='const_ad_reserve')  # Adversarial reserve constraint
-    model.addConstrs(p_n[n] - gen_max[n] - alpha_n[n]*inv_phi_eps*w_sigma <= 0 for n in gen_set_index)     # Max generation limit constraint%
-    
-    model.addConstrs(aux_lambda_a[n] == l_opt[n]*alpha_n[n] for n in gen_set_index)
-    model.addConstrs(aux_lambda_b[n] == l_opt[n]*beta_n[n] for n in gen_set_index)
-
-    ## LDT Constrain
-    model.addConstrs(-gen_max[n] + p_n[n] - aux_omega_a[n] - aux_omega_b[n] == 0 for n in gen_set_index)
-
-    ## Allow QCP dual 
-    model.setParam('MIPGap', 0.01)
-    model.setParam('Timelimit', 600)
-    # Solve
-    model.optimize()
-
-    # Print results
-    obj = model.getObjective()
-    ## Primal solution
-    print("\nThe optimal value is", obj.getValue())
-    print("A solution p_n is")
-    for v in p_n.values():
-        print("{}: {}".format(v.varName, v.X))
-    print("A solution alpha_n is")
-    for v in alpha_n.values():
-        print("{}: {}".format(v.varName, v.X))
-    print("A solution beta_n is")
-    for v in beta_n.values():
-        print("{}: {}".format(v.varName, v.X))
-    print("A solution s_i is")    
-    for v in s_i.values():
-        print("{}: {}".format(v.varName, v.X))
-    print("A solution omega_star is")
-    print("{}: {}".format(omega_star.varName, omega_star.X))
-    print("A solution lambda_n is")
-    for v in lambda_n.values():
-        print("{}: {}".format(v.varName, v.X))
-    print("A solution f_ij is")
-    for v in f_ij.values():
-        print("{}: {}".format(v.varName, v.X))
-
-    o_opt = obj.getValue()
-    p_opt = []
-    a_opt = []
-    b_opt = []
+        for gen in gen_set_index:
+            energy_list_3[gen_node[gen]] += p_opt3[gen]
+            sreserve_list_3[gen_node[gen]] += a_opt3[gen]
+            ereserve_list_3[gen_node[gen]] += b_opt3[gen]
 
 
-    for v in p_n.values():
-        p_opt.append(round(v.X,4))
-    for v in alpha_n.values():
-        a_opt.append(round(v.X,4))
-    for v in beta_n.values():
-        b_opt.append(round(v.X,4))
-    for v in lambda_n.values():
-        l_opt.append(round(v.X,4))
+        print("CC")
+        print(energy_list_1)
+        print(sreserve_list_1)
 
-    for c in const_demand.values():
-        print(c.constrName, c.Pi)
-    print(const_op_reserve.constrName, const_op_reserve.Pi)
-    print(const_ad_reserve.constrName, const_ad_reserve.Pi)
+        print("WCC")
+        print(energy_list_2)
+        print(sreserve_list_2)
+        print(ereserve_list_2)
 
-    ## Dual solution
-    #for v in const_demand.constrName:
-    #    print("{}: {}".format(const_demand.constrName, const_demand.Pi))
-    #print("The demand cons. dual values are")
-    #print("{}: {}".format(const_demand.constrName, const_demand.Pi))
-    #print("The operational reserve cons. dual values are")
-    #print("{}: {}".format(const_op_reserve.constrName, const_op_reserve.Pi))
-    #print("The adversarialreserve cons. dual values are")
-    #print("{}: {}".format(const_ad_reserve.constrName, const_ad_reserve.Pi)) 
-    #for v in p_n.values():
-    #    print("{}: {}".format(v.varName, v.X))
-    #for c in cons_reserve.values():
-    #    print("{}: {}".format(c.constrName, c.Pi))  # .QCPi is used for quadratic constraints
+        print("LDC")
+        print(energy_list_3)
+        print(sreserve_list_3)
+        print(ereserve_list_3)
 
-    return o_opt, p_opt, a_opt, b_opt, w_opt, l_opt 
-
-#print("\nLDT Solve price")
-#o_opt3p, p_opt3p, a_opt3p, b_opt3p , w_optp, l_optp = EconomicDispatch_LDT_network_price(power_system,node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_opt3, l_opt3)
-
-
-
-# PRINT SOLUTIONS
-'''
-print("\nCC")
-print(o_opt1)
-print(p_opt1)
-print(a_opt1)
-print(b_opt1)
-
-print("\nWCC")
-print(o_opt2)
-print(p_opt2)
-print(a_opt2)
-print(b_opt2)
-
-print("\nLDT")
-print(o_opt3)
-print(p_opt3)
-print(a_opt3)
-print(b_opt3)
-print(b_opt2)
-'''
 
 # TEST SCENARIOS
 
-flag_test = False
-flag_test_Network = False
+def find_price(gen_node,list_node_price):
+    price_per_generator = np.zeros(len(gen_node))
+    for g in range(len(gen_node)):
+        for n in range(len(list_node_price)):
+            if gen_node[g] == n:
+                price_per_generator[g] = list_node_price[n]
+    return price_per_generator
 
-def test_funtion(w, w_bar, p_opt,a_opt,b_opt, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind):
+def test_funtion(w, w_bar, p_opt,a_opt,b_opt, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,gen_calpha,gen_cbeta,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_sigma):
     flag_print = False
-
+    epsilon = 0.05
+    inv_phi_eps = norm.ppf(1-epsilon)
 
     # Create a new model
     model = gb.Model()
@@ -973,10 +1030,10 @@ def test_funtion(w, w_bar, p_opt,a_opt,b_opt, node_set_index,gen_set_index,lines
     beta_n = model.addVars(gen_set_index, vtype=GRB.CONTINUOUS, name="beta_n", lb=1e-8) # Operational reserve variable adverse
 
     # Set objective function
-    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*9000 for i in node_set_index), GRB.MINIMIZE)
+    obj_value = model.setObjective( sum(p_n[n]*gen_cmg[n] + p_n[n]**2*gen_cmg_b[n]+ gen_calpha[n]*alpha_n[n] + gen_cbeta[n]*beta_n[n] for n in gen_set_index) + sum(s_i[i]*9000 for i in node_set_index), GRB.MINIMIZE)
 
     # Add constraints
-    const_demand = model.addConstrs((sum(p_n[n] + (alpha_n[n]+beta_n[n])*w[0] for n in node_gens[i]) - w[0] + w_bar
+    const_demand = model.addConstrs((sum(p_n[n] + (alpha_n[n]+beta_n[n])*w[0] for n in node_gens[i]) + sum((w_bar- w[0])*wind_factor[n] for n in node_wind[i])
                                  - sum(f_ij[i,j] for (i,j) in lines_node_in[i])
                                  + sum(f_ij[i,j] for (i,j) in lines_node_out[i])
                                  + s_i[i]  == node_demand[i] for i in node_set_index), name='const_demand') # Demand constraints
@@ -993,7 +1050,7 @@ def test_funtion(w, w_bar, p_opt,a_opt,b_opt, node_set_index,gen_set_index,lines
     cons_ad_reserve = model.addConstrs((beta_n[n] <= b_opt[n] for n in gen_set_index), name='cons_ad_reserve')
 
     # Constraints
-    cons_pmax = model.addConstrs((p_n[n]<= gen_max[n] for n in gen_set_index), name='cons_pmax') 
+    cons_pmax = model.addConstrs((p_n[n]<= gen_max[n] for n in gen_set_index), name='cons_pmax')
 
     # Solve
     model.optimize()
@@ -1035,94 +1092,129 @@ def test_funtion(w, w_bar, p_opt,a_opt,b_opt, node_set_index,gen_set_index,lines
     return o_opt, p_opt, a_opt, b_opt
 
 def test(p_opt1,a_opt1,b_opt1,p_opt2,a_opt2,b_opt2, p_opt3,a_opt3,b_opt3):
-    list_obj1_s = []; list_obj1_o = []
-    list_obj2_s = []; list_obj2_o = []
-    list_obj3_s = []; list_obj3_o = []
-    for _ in range(199):
-        w_bar = 20; w_sigma = 5
-        mu, sigma = w_bar, w_sigma 
-        w = np.random.normal(0, sigma, 1)
+    list_obj1_o = []
+    list_obj2_o = []
+    list_obj3_o = []
+    list_omega = []
+    for _ in range(300):
+        w_bar = 40; w_sigma = 10
+        w = np.random.normal(0, w_sigma, 1)
+        list_omega.append(w)
         print(w)
         print("\nTest Solve",_)
-        if w <5:
-            o_opt01, p_opt01, a_opt01, b_opt01 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-            list_obj1_o.append(o_opt01)
-            o_opt02, p_opt02, a_opt02, b_opt02 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-            list_obj2_o.append(o_opt02)
-            o_opt03, p_opt03, a_opt03, b_opt03 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-            list_obj3_o.append(o_opt03)
-        elif w>5:
-            o_opt01, p_opt01, a_opt01, b_opt01 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-            list_obj1_o.append(o_opt01)
-            o_opt02, p_opt02, a_opt02, b_opt02 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-            list_obj2_o.append(o_opt02)
-            o_opt03, p_opt03, a_opt03, b_opt03 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-            list_obj3_o.append(o_opt03)
 
-    w = [17.5]
-    print("\nTest Solve",_)
-    o_opt011, p_opt011, a_opt011, b_opt011 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-    list_obj1_o.append(o_opt011)
-    o_opt022, p_opt022, a_opt022, b_opt022 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-    list_obj2_o.append(o_opt022)
-    o_opt033, p_opt033, a_opt033, b_opt033 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind)
-    list_obj3_o.append(o_opt033)
+        gen_cmg_1 = find_price(gen_node, p_price1)
+        gen_calpha_1 = np.ones(len(gen_node))*a_price1
+        gen_cbeta_1 = np.ones(len(gen_node))*9000
 
-    return list_obj1_s, list_obj1_o, list_obj2_s, list_obj2_o, list_obj3_s, list_obj3_o
+        o_opt01, p_opt01, a_opt01, b_opt01 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg_1,gen_calpha_1,gen_cbeta_1,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_sigma)
+        list_obj1_o.append(o_opt01)
+
+        gen_cmg_2 = find_price(gen_node, p_price2)
+        gen_calpha_2 = np.ones(len(gen_node))*a_price2
+        gen_cbeta_2 = np.ones(len(gen_node))*b_price2
+        o_opt02, p_opt02, a_opt02, b_opt02 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg_2,gen_calpha_2,gen_cbeta_2,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_sigma)
+        list_obj2_o.append(o_opt02)
+        
+        gen_cmg_3 = find_price(gen_node, p_price3)
+        gen_calpha_3 = np.ones(len(gen_node))*a_price3
+        gen_cbeta_3 = np.ones(len(gen_node))*b_price3
+        o_opt03, p_opt03, a_opt03, b_opt03 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg_3,gen_calpha_3,gen_cbeta_3,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_sigma)
+        list_obj3_o.append(o_opt03)
+
+    return list_omega, list_obj1_o, list_obj2_o, list_obj3_o
 
 if flag_test:
-    list_obj1_s, list_obj1_o, list_obj2_s, list_obj2_o, list_obj3_s, list_obj3_o = test(p_opt1,a_opt1,b_opt1,p_opt2,a_opt2,b_opt2, p_opt3,a_opt3,b_opt3)
-    print("CC_s, mean {}, std {}".format(np.mean(list_obj1_s),np.std(list_obj1_s)))
-    print("LTD_s, mean {}, std {}".format(np.mean(list_obj2_s),np.std(list_obj2_s)))
-    print("WCC_s, mean {}, std {}".format(np.mean(list_obj3_s),np.std(list_obj3_s)))
-    print("CC_o, mean {}, std {}".format(np.mean(list_obj1_o),np.std(list_obj1_o)))
-    print("LTD_o, mean {}, std {}".format(np.mean(list_obj2_o),np.std(list_obj2_o)))
-    print("WCC_o, mean {}, std {}".format(np.mean(list_obj3_o),np.std(list_obj3_o)))
+    list_omega, list_obj1_o, list_obj2_o, list_obj3_o = test(p_opt1,a_opt1,b_opt1,p_opt2,a_opt2,b_opt2, p_opt3,a_opt3,b_opt3)
+    print("Omeg, mean {}, std {}, max {}, min {}".format(np.mean(list_omega),np.std(list_omega),np.max(list_omega),np.min(list_omega)))
+    print("CC_o, mean {}, std {}, max {}, min {}".format(np.mean(list_obj1_o),np.std(list_obj1_o),np.max(list_obj1_o),np.min(list_obj1_o)))
+    print("WCC_o, mean {}, std {}, max {}, min {}".format(np.mean(list_obj2_o),np.std(list_obj2_o),np.max(list_obj2_o),np.min(list_obj2_o)))
+    print("LDT_o, mean {}, std {}, max {}, min {}".format(np.mean(list_obj3_o),np.std(list_obj3_o),np.max(list_obj3_o),np.min(list_obj3_o)))
 
-if flag_test_Network :
+def test_network(p_opt1,a_opt1,b_opt1,p_opt2,a_opt2,b_opt2, p_opt3,a_opt3,b_opt3):
+    list_obj1_o = []; list_obj2_o = []; list_obj3_o = []
+    list_p1_o = []; list_p2_o = []; list_p3_o = []
+    list_a1_o = []; list_a2_o = []; list_a3_o = []
+    list_b1_o = []; list_b2_o = []; list_b3_o = []
+    list_omega = []
 
-    energy_list_1 = np.zeros(len(node_set_index))
-    sreserve_list_1 = np.zeros(len(node_set_index))
-    ereserve_list_1 = np.zeros(len(node_set_index))
+    for _ in range(100):
+        w_bar = 3700; w_sigma = 1000
+        w = np.random.normal(0, w_sigma, 1)
+        list_omega.append(w)
+        print(w)
+        print("\nTest Solve",_)
 
-    for gen in gen_set_index:
-        energy_list_1[gen_node[gen]] += p_opt1[gen]
-        sreserve_list_1[gen_node[gen]] += a_opt1[gen]
-        #ereserve_list[gen_node[gen]] = 
+        ############## model CC ##########
+        gen_cmg_1 = find_price(gen_node, p_price1)
+        gen_calpha_1 = np.ones(len(gen_node))*a_price1
+        gen_cbeta_1 = np.ones(len(gen_node))*90000000
 
+        o_opt01, p_opt01, a_opt01, b_opt01 = test_funtion(w, w_bar, p_opt1,a_opt1,b_opt1, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg_1,gen_calpha_1,gen_cbeta_1,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_sigma)
+        list_obj1_o.append(o_opt01)
 
-    energy_list_2 = np.zeros(len(node_set_index))
-    sreserve_list_2 = np.zeros(len(node_set_index))
-    ereserve_list_2 = np.zeros(len(node_set_index))
+        #convert into a zone info
+        energy_list_1 = np.zeros(len(node_set_index))
+        sreserve_list_1 = np.zeros(len(node_set_index))
 
-    for gen in gen_set_index:
-        energy_list_2[gen_node[gen]] += p_opt2[gen]
-        sreserve_list_2[gen_node[gen]] += a_opt2[gen]
-        ereserve_list_2[gen_node[gen]] += b_opt2[gen]
+        for gen in gen_set_index:
+            energy_list_1[gen_node[gen]] += p_opt01[gen]
+            sreserve_list_1[gen_node[gen]] += a_opt01[gen]
 
-    energy_list_3 = np.zeros(len(node_set_index))
-    sreserve_list_3 = np.zeros(len(node_set_index))
-    ereserve_list_3 = np.zeros(len(node_set_index))
+        list_p1_o.append(energy_list_1) # list_p1_o.append(p_opt01)
+        list_a1_o.append(sreserve_list_1) # list_a1_o.append(a_opt01)
 
-    for gen in gen_set_index:
-        energy_list_3[gen_node[gen]] += p_opt3[gen]
-        sreserve_list_3[gen_node[gen]] += a_opt3[gen]
-        ereserve_list_3[gen_node[gen]] += b_opt3[gen]
-   
+        ############## model WCC ##########
+        gen_cmg_2 = find_price(gen_node, p_price2)
+        gen_calpha_2 = np.ones(len(gen_node))*a_price2
+        gen_cbeta_2 = np.ones(len(gen_node))*b_price2
+        o_opt02, p_opt02, a_opt02, b_opt02 = test_funtion(w, w_bar, p_opt2,a_opt2,b_opt2, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg_2,gen_calpha_2,gen_cbeta_2,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_sigma)
+        list_obj2_o.append(o_opt02)
 
-    #print(energy_list_1)
-    #print(sreserve_list_1)
-    #print(ereserve_list_1)
+        #convert into a zone info
+        energy_list_2 = np.zeros(len(node_set_index))
+        sreserve_list_2 = np.zeros(len(node_set_index))
+        ereserve_list_2 = np.zeros(len(node_set_index))
 
-    #print(energy_list_2)
-    #print(sreserve_list_2)
-    #print(ereserve_list_2)
+        for gen in gen_set_index:
+            energy_list_2[gen_node[gen]] += p_opt02[gen]
+            sreserve_list_2[gen_node[gen]] += a_opt02[gen]
+            ereserve_list_2[gen_node[gen]] += b_opt02[gen]
 
-    #print(energy_list_3)
-    #print(sreserve_list_3)
-    #print(ereserve_list_3)
+        list_p2_o.append(energy_list_2) # list_p2_o.append(p_opt02)
+        list_a2_o.append(sreserve_list_2) # list_a2_o.append(a_opt02)
+        list_b2_o.append(ereserve_list_2) # list_b2_o.append(b_opt02)
+        
+        ############## model LDT ##########
+        gen_cmg_3 = find_price(gen_node, p_price3)
+        gen_calpha_3 = np.ones(len(gen_node))*a_price3
+        gen_cbeta_3 = np.ones(len(gen_node))*b_price3
+        o_opt03, p_opt03, a_opt03, b_opt03 = test_funtion(w, w_bar, p_opt3,a_opt3,b_opt3, node_set_index,gen_set_index,lines_node_index,node_gens,gen_max,line_f_max_matrix,gen_cmg_3,gen_calpha_3,gen_cbeta_3,line_susceptance_matrix,node_demand,lines_node_in,lines_node_out, node_wind, w_sigma)
+        list_obj3_o.append(o_opt03)
 
-#print(zonas)
+        #convert into a zone info
+        energy_list_3 = np.zeros(len(node_set_index))
+        sreserve_list_3 = np.zeros(len(node_set_index))
+        ereserve_list_3 = np.zeros(len(node_set_index))
+
+        for gen in gen_set_index:
+            energy_list_3[gen_node[gen]] += p_opt03[gen]
+            sreserve_list_3[gen_node[gen]] += a_opt03[gen]
+            ereserve_list_3[gen_node[gen]] += b_opt03[gen]
+
+        list_p3_o.append(energy_list_3) # list_p3_o.append(p_opt03)
+        list_a3_o.append(sreserve_list_3) # list_a3_o.append(a_opt03)
+        list_b3_o.append(ereserve_list_3) # list_b3_o.append(b_opt03)
+
+    return list_omega, list_obj1_o, list_obj2_o, list_obj3_o
+
+if flag_test_Network:
+    print(zonas)
+    list_omega, list_obj1_o, list_obj2_o, list_obj3_o = test_network(p_opt1,a_opt1,b_opt1,p_opt2,a_opt2,b_opt2, p_opt3,a_opt3,b_opt3)
+    print("Omeg, mean {}, std {}, max {}, min {}".format(np.mean(list_omega),np.std(list_omega),np.max(list_omega),np.min(list_omega)))
+    print("CC_o, mean {}, std {}, max {}, min {}".format(np.mean(list_obj1_o),np.std(list_obj1_o),np.max(list_obj1_o),np.min(list_obj1_o)))
+    print("WCC_o, mean {}, std {}, max {}, min {}".format(np.mean(list_obj2_o),np.std(list_obj2_o),np.max(list_obj2_o),np.min(list_obj2_o)))
+    print("LDT_o, mean {}, std {}, max {}, min {}".format(np.mean(list_obj3_o),np.std(list_obj3_o),np.max(list_obj3_o),np.min(list_obj3_o)))
 
 if aux_test == True:
     cdf_mean  = 12
