@@ -49,7 +49,7 @@ def plot_1(color_in, list_avg_scheduled, list_avg_outschedule, list_std_schedule
 
     plt.xticks(X_axis, X) 
     #plt.xlabel("Models") 
-    plt.ylabel("Total cost [$]") 
+    plt.ylabel("Total cost [MM$]") 
     #plt.title("Number of Students in each group") 
     plt.legend(bbox_to_anchor=(0.8, 1.25), ncols=3)
     plt.savefig(name_fig)
@@ -95,8 +95,14 @@ def plot_2(color_in, list_energy, list_rreserve, list_ereserve, name_fig):
     #plt.show()
     plt.savefig(name_fig)
 
-def plot_3(color_in, list_energy, list_rreserve, list_ereserve, name_fig):
+def plot_3(color_in, list_energy, list_rreserve, list_ereserve, name_fig, str_type):
     color = color_in
+
+    if str_type =="reserve":
+        aux_string = "[%]"
+    elif str_type =="energy":
+        aux_string = "[MW]"
+
     def sum_list(list1, list2):
         return  list( map(np.add, list1, list2) )
     
@@ -112,13 +118,13 @@ def plot_3(color_in, list_energy, list_rreserve, list_ereserve, name_fig):
 
     # plot bars in stack manner
     plt.bar(X_axis - 0.25, cc_y1, 0.2,  color= color[0], label = "CC")
-    plt.bar(X_axis, cc_y2, 0.2, color=color[1], label = "LDT-CC")
-    plt.bar(X_axis + 0.25, cc_y3, 0.2, color=color[2], label = "LDT-WCC")
+    plt.bar(X_axis, cc_y2, 0.2, color=color[1], label = "LDT-WCC")
+    plt.bar(X_axis + 0.25, cc_y3, 0.2, color=color[2], label = "LDT-CC")
 
     #plt.ylim(0, 105)
-    plt.ylabel("Energy/Reserve supply [MW]") 
+    plt.ylabel("Energy/Reserve supply "+aux_string) 
     plt.xticks(X_axis, x) 
-    ax.legend(bbox_to_anchor=(0.8, 1.25), ncols=3)
+    ax.legend(bbox_to_anchor=(0.75, 1.25), ncols=3)
     plt.tight_layout()
     plt.savefig(name_fig)
 
@@ -210,19 +216,48 @@ aux_e = sum([2508.012,  1746.864,     0,     1618.272,  2352.0236,  705.1681,  4
 list_energy = [2508.012,  1746.864,     0,     1618.272,  2352.0236,  705.1681,  446.544, 275.544]
 list_rreserve = [2509.3906, 1746.864,     0,     1618.272,  2350.9298,  704.8833,  446.544, 275.544 ]
 list_ereserve = [2507.9471, 1746.7665,    0,     1618.1848, 2352.1828,  705.2897,  446.5344, 275.5221]
-plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3.pdf')
+plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3.pdf', "energy")
 
 
 #CC
 list_energy = [0.0347, 0.2775, 0,     0,     0.3062, 0.3815, 0,     0]
 list_rreserve = [0.7447, 0.0171, 0,     0,     0.108, 0.1301, 0,     0    ]
 list_ereserve = [0.2654, 0.3032, 0,     0,     0.2056, 0.1016, 0,     0.1238]
-plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3b.pdf')
+plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3b.pdf', "reserve")
 
 #CC
 aux_e = sum([2508.012,  1746.864,     0,     1618.272,  2352.0236,  705.1681,  446.544, 275.544])
 list_energy = [0,0,0,0,0,0,0,0]
 list_rreserve = [0.1642, 0.2569, 0,     0,     0.167,  0.3642, 0,     0.0471]
 list_ereserve = [0.1908, 0.294,  0,     0,     0.1572, 0.3076, 0,     0.0504]
-plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3c.pdf')
+plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3c.pdf', "reserve")
 
+
+
+
+
+### Part 3
+# Extended test 2 - price comparison
+list_avg_price_scheduled = [0.404472, 0.44056661036, 0.4405886634]
+list_std_price_scheduled = [0,0,0]
+list_avg_price_outscheduled = [1.815566631, 0.983379213, 1.156109785]
+list_std_price_outscheduled = [0.661091990, 0.05740580, 0.317640118]
+plot_1(color_base, list_avg_price_scheduled, list_avg_price_outscheduled, list_std_price_scheduled, list_std_price_outscheduled, 'Figure_F1.pdf')
+
+# Energy dispatch
+list_CC =      [1830.2444, 1674.078,     0,     1542.978,  1814.838,  1639.207,   427.938, 423.1444]
+list_LDT_WCC = [1830.2444, 1674.078,     0,     1542.978,  1814.838,  1639.207,   427.938, 423.1444]
+list_LDT_CC =  [1830.2611, 1674.0641,    0,     1542.9554, 1814.7932, 1639.2017,  427.9296, 423.2226]
+plot_3(color_base, list_CC, list_LDT_WCC , list_LDT_CC, 'Figure_F2a.pdf', "energy")
+
+# Reg. Reserve dispatch
+list_CC =      [0.4771, 0,     0,     0,     0,    0.3052, 0,     0.2177]
+list_LDT_WCC = [0,     0.4865, 0,     0,     0.3562, 0,     0,     0.1573]
+list_LDT_CC =  [0.0043, 0.3712, 0,     0,    0.4985, 0.0006, 0,     0.1252]
+plot_3(color_base, list_CC, list_LDT_WCC , list_LDT_CC, 'Figure_F2b.pdf', "reserve")
+
+# Ext. Reserve dispatch
+list_CC =      [0,0,0,0,0,0,0,0]
+list_LDT_WCC = [0.6467, 0.1158, 0,     0,     0,     0.2317, 0,     0.0058]
+list_LDT_CC =  [0.6333, 0.2358, 0,     0,     0.0058, 0.1214, 0,     0.0036]
+plot_3(color_base, list_CC, list_LDT_WCC , list_LDT_CC, 'Figure_F2c.pdf', "reserve")
