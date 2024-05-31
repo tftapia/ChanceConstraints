@@ -978,6 +978,76 @@ if flag_solve:
     #print(b_opt3, b_opt3p)
     print(p_price3, a_price3, b_price3)
 
+    if not(power_system):
+        list_revenue_p1= []
+        list_cost_p1= []
+        list_profit_p1= []
+        list_revenue_a1= []
+        list_cost_a1= []
+        list_profit_a1= []
+        list_revenue_p2= []
+        list_cost_p2= []
+        list_profit_p2= []
+        list_revenue_a2= []
+        list_cost_a2= []
+        list_profit_a2= []
+        list_revenue_b2= []
+        list_cost_b2= []
+        list_profit_b2= []
+
+        list_revenue_p3= []
+        list_cost_p3= []
+        list_profit_p3= []
+        list_revenue_a3= []
+        list_cost_a3= []
+        list_profit_a3= []
+        list_revenue_b3= []
+        list_cost_b3 = []
+        list_profit_b3= []
+
+        for gen in gen_set_index:
+            list_revenue_p1.append(p_opt1[gen]*p_price1[0])
+            list_cost_p1.append(p_opt1[gen]*gen_cmg[gen] + p_opt1[gen]**2*gen_cmg_b[gen])
+            list_profit_p1.append(p_opt1[gen]*p_price1[0] - p_opt1[gen]*gen_cmg[gen] - p_opt1[gen]**2*gen_cmg_b[gen])
+            list_revenue_a1.append(a_opt1[gen]*a_price1)
+            list_cost_a1.append(a_opt1[gen]*gen_calpha[gen])
+            list_profit_a1.append(a_opt1[gen]*a_price1 - a_opt1[gen]*gen_calpha[gen])
+
+            list_revenue_p2.append(p_opt2[gen]*p_price2[0])
+            list_cost_p2.append(p_opt2[gen]*gen_cmg[gen] + p_opt2[gen]**2*gen_cmg_b[gen])
+            list_profit_p2.append(p_opt2[gen]*p_price2[0] - p_opt2[gen]*gen_cmg[gen] - p_opt2[gen]**2*gen_cmg_b[gen])
+            list_revenue_a2.append(a_opt2[gen]*a_price2)
+            list_cost_a2.append(a_opt2[gen]*gen_calpha[gen])
+            list_profit_a2.append(a_opt2[gen]*b_price2 - a_opt2[gen]*gen_calpha[gen])
+            list_revenue_b2.append(b_opt2[gen]*b_price2)
+            list_cost_b2.append(b_opt2[gen]*gen_cbeta[gen])
+            list_profit_b2.append(b_opt2[gen]*b_price2 - b_opt2[gen]*gen_cbeta[gen])
+
+            list_revenue_p3.append(p_opt3[gen]*p_price3[0])
+            list_cost_p3.append(p_opt3[gen]*gen_cmg[gen] + p_opt3[gen]**2*gen_cmg_b[gen])
+            list_profit_p3.append(p_opt3[gen]*p_price3[0] - p_opt3[gen]*gen_cmg[gen] - p_opt3[gen]**2*gen_cmg_b[gen])
+            list_revenue_a3.append(a_opt3[gen]*a_price3)
+            list_cost_a3.append(a_opt3[gen]*gen_calpha[gen])
+            list_profit_a3.append(a_opt3[gen]*b_price3 - a_opt3[gen]*gen_calpha[gen])
+            list_revenue_b3.append(b_opt3[gen]*b_price3)
+            list_cost_b3.append(b_opt3[gen]*gen_cbeta[gen])
+            list_profit_b3.append(b_opt3[gen]*b_price3 - b_opt3[gen]*gen_cbeta[gen])
+
+        print("\n energy")
+        print(list_revenue_p3)
+        print(list_cost_p3)
+        print(list_profit_p3)
+
+        print("\n reg reserve")
+        print(list_revenue_a3)
+        print(list_cost_a3)
+        print(list_profit_a3)
+
+        print("\n ext reserve")
+        print(list_revenue_b3)
+        print(list_cost_b3)
+        print(list_profit_b3)
+
     if power_system:
         #convert into a zone info
         energy_list_1 = np.zeros(len(node_set_index))
@@ -1024,6 +1094,46 @@ if flag_solve:
 
         print(zonas)
 
+    if power_system:
+        #convert into a zone info
+        cc_list_1R = np.zeros(len(node_set_index))
+        cc_list_1C = np.zeros(len(node_set_index))
+        cc_list_1P = np.zeros(len(node_set_index))
+        wcc_list_1R = np.zeros(len(node_set_index))
+        wcc_list_1C = np.zeros(len(node_set_index))
+        wcc_list_1P = np.zeros(len(node_set_index))
+        ldt_list_1R = np.zeros(len(node_set_index))
+        ldt_list_1C = np.zeros(len(node_set_index))
+        ldt_list_1P = np.zeros(len(node_set_index))
+
+        for gen in gen_set_index:
+            cc_list_1R[gen_node[gen]] += p_opt1[gen]*p_price1[gen_node[gen]] + a_opt1[gen]*a_price1
+            cc_list_1C[gen_node[gen]] += p_opt1[gen]*gen_cmg[gen] + p_opt1[gen]**2*gen_cmg_b[gen] + a_opt1[gen]*gen_calpha[gen]
+            cc_list_1P[gen_node[gen]] += p_opt1[gen]*p_price1[gen_node[gen]] - p_opt1[gen]*gen_cmg[gen] - p_opt1[gen]**2*gen_cmg_b[gen] + a_opt1[gen]*a_price1 - a_opt1[gen]*gen_calpha[gen]
+
+            wcc_list_1R[gen_node[gen]] += p_opt2[gen]*p_price2[gen_node[gen]] + a_opt2[gen]*a_price2 + b_opt2[gen]*b_price2
+            wcc_list_1C[gen_node[gen]] += p_opt2[gen]*gen_cmg[gen] + p_opt2[gen]**2*gen_cmg_b[gen] + a_opt2[gen]*gen_calpha[gen] + b_opt2[gen]*gen_cbeta[gen]
+            wcc_list_1P[gen_node[gen]] += p_opt2[gen]*p_price2[gen_node[gen]] - p_opt2[gen]*gen_cmg[gen] - p_opt2[gen]**2*gen_cmg_b[gen] + a_opt2[gen]*a_price2 - a_opt2[gen]*gen_calpha[gen] + b_opt2[gen]*b_price2 - b_opt2[gen]*gen_cbeta[gen]
+            
+            ldt_list_1R[gen_node[gen]] += p_opt3[gen]*p_price3[gen_node[gen]] + a_opt3[gen]*a_price3 + b_opt3[gen]*b_price3
+            ldt_list_1C[gen_node[gen]] += p_opt3[gen]*gen_cmg[gen] + p_opt3[gen]**2*gen_cmg_b[gen] + a_opt3[gen]*gen_calpha[gen] + b_opt3[gen]*gen_cbeta[gen]
+            ldt_list_1P[gen_node[gen]] += p_opt3[gen]*p_price3[gen_node[gen]] - p_opt3[gen]*gen_cmg[gen] - p_opt3[gen]**2*gen_cmg_b[gen] + a_opt3[gen]*a_price3 - a_opt3[gen]*gen_calpha[gen] + b_opt3[gen]*b_price3 - b_opt3[gen]*gen_cbeta[gen]
+            
+        print("\nCC")
+        print(cc_list_1R)
+        print(cc_list_1C)
+        print(cc_list_1P)
+        print("\nWCC ")
+        print(wcc_list_1R)
+        print(wcc_list_1C)
+        print(wcc_list_1P)
+        print("\nCC Extreme")
+        print(ldt_list_1R)
+        print(ldt_list_1C)
+        print(ldt_list_1P)
+
+    # generadores funcionando
+    '''
     m = max(p_opt2)
     list_p = []
     # Finding the index of the maximum element
@@ -1061,6 +1171,7 @@ if flag_solve:
         i += 1
     print(list_b)
     #print(b_opt2)
+    '''
 
 # TEST SCENARIOS
 

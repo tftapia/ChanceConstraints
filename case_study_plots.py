@@ -199,44 +199,7 @@ plot_1(color_base, list_avg_price_scheduled, list_avg_price_outscheduled, list_s
 
 
 
-# Extended test 2 - price comparison
-list_avg_price_scheduled = [435806.46868755925, 436177.58606514346, 436319.510435296]
-list_std_price_scheduled = [0,0,0]
-list_avg_price_outscheduled = [589025.123, 511984.397, 512495.027]
-list_std_price_outscheduled = [114829.341, 35886.580, 36070.525]
-plot_1(color_base, list_avg_price_scheduled, list_avg_price_outscheduled, list_std_price_scheduled, list_std_price_outscheduled, 'Figure_2.pdf')
-
-#prices 
-#[57.7782, 57.8161, 57.8387, 57.8161, 57.7429, 57.9141, 57.8057, 57.79] 117.00010514702483
-#[57.861, 57.8982, 57.9203, 57.8982, 57.8263, 57.9944, 57.8879, 57.8726] 260.1819951052312 372.56711987024755
-#[57.9101, 57.9479, 57.9705, 57.9479, 57.8747, 58.046, 57.9375, 57.9219] 530.659789666575 665.0597745798633
-
-#Energy
-aux_e = sum([2508.012,  1746.864,     0,     1618.272,  2352.0236,  705.1681,  446.544, 275.544])
-list_energy = [2508.012,  1746.864,     0,     1618.272,  2352.0236,  705.1681,  446.544, 275.544]
-list_rreserve = [2509.3906, 1746.864,     0,     1618.272,  2350.9298,  704.8833,  446.544, 275.544 ]
-list_ereserve = [2507.9471, 1746.7665,    0,     1618.1848, 2352.1828,  705.2897,  446.5344, 275.5221]
-plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3.pdf', "energy")
-
-
-#CC
-list_energy = [0.0347, 0.2775, 0,     0,     0.3062, 0.3815, 0,     0]
-list_rreserve = [0.7447, 0.0171, 0,     0,     0.108, 0.1301, 0,     0    ]
-list_ereserve = [0.2654, 0.3032, 0,     0,     0.2056, 0.1016, 0,     0.1238]
-plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3b.pdf', "reserve")
-
-#CC
-aux_e = sum([2508.012,  1746.864,     0,     1618.272,  2352.0236,  705.1681,  446.544, 275.544])
-list_energy = [0,0,0,0,0,0,0,0]
-list_rreserve = [0.1642, 0.2569, 0,     0,     0.167,  0.3642, 0,     0.0471]
-list_ereserve = [0.1908, 0.294,  0,     0,     0.1572, 0.3076, 0,     0.0504]
-plot_3(color_base, list_energy, list_rreserve, list_ereserve, 'Figure_3c.pdf', "reserve")
-
-
-
-
-
-### Part 3
+### Part 3 EXTENDED STUDY CASE
 # Extended test 2 - price comparison
 list_avg_price_scheduled = [0.404472, 0.44056661036, 0.4405886634]
 list_std_price_scheduled = [0,0,0]
