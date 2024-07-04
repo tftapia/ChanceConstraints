@@ -1,0 +1,4 @@
+"Gen Name","Node Location","Capacity (MW)","Dispatch Cost Coefficient a ($/MWh)","Dispatch Cost Coefficient b ($/MW^2h)","Dispatch Cost Coefficient Alpha ($/%MWh)","Dispatch Cost Coefficient Beta ($/%MWh)"
+Generator_1, 0, 40, 25, 0.001, 100, 100
+Generator_2, 0, 45, 30, 0.003, 55, 55
+Generator_3, 0, 50, 35, 0.005, 120, 120
