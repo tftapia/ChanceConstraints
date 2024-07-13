@@ -1,2 +1,2 @@
 "Wind Name","Node Location","Capacity (MW)","Factor","Mean (MW)","Std (MW)"
-Wind_1, 0, 60, 1, 60, 25
+Wind_1, 0, 200, 1, 150, 50
