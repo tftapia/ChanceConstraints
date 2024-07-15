@@ -39,7 +39,6 @@ def taylor_approximation(mu,sigma,a,b):
     return t_approx
 
 
-
 # For each generator find the its price associated with its node 
 def find_price(system_data, system_solution):
     price_per_generator = np.zeros(len(system_data["set_gen_index"]))
@@ -51,7 +50,7 @@ def find_price(system_data, system_solution):
     return price_per_generator
 
 # Compute profit, cost, and revenue for each generator
-def gen_profit(system_data, system_solution):
+def gen_profit(system_data, system_solution, digit_round = 4):
     sys_w_sigma = sum(system_data["wind_std"].values())
     price_per_generator = find_price(system_data, system_solution)
 
@@ -68,16 +67,16 @@ def gen_profit(system_data, system_solution):
         solution_dict["b_profit"] = dict()
 
     for n in system_data["set_gen_index"]:
-        solution_dict["p_revenue"][n] = system_solution["p_opt"][n]*price_per_generator[n]
-        solution_dict["p_cost"][n] = system_solution["p_opt"][n]*system_data["gen_c1"][n] + (system_solution["p_opt"][n]**2)*system_data["gen_c2"][n]
-        solution_dict["p_profit"][n] = solution_dict["p_revenue"][n] - solution_dict["p_cost"][n]
-        solution_dict["a_revenue"][n] = system_solution["a_opt"][n]*system_solution["a_price"]
-        solution_dict["a_cost"][n] =  (system_solution["a_opt"][n]**2)*(sys_w_sigma**2)*system_data["gen_c2"][n]
-        solution_dict["a_profit"][n] = solution_dict["a_revenue"][n] - solution_dict["a_cost"][n]
+        solution_dict["p_revenue"][n] = round(system_solution["p_opt"][n]*price_per_generator[n], digit_round)
+        solution_dict["p_cost"][n] = round(system_solution["p_opt"][n]*system_data["gen_c1"][n] + (system_solution["p_opt"][n]**2)*system_data["gen_c2"][n], digit_round)
+        solution_dict["p_profit"][n] = round(solution_dict["p_revenue"][n] - solution_dict["p_cost"][n], digit_round)
+        solution_dict["a_revenue"][n] = round(system_solution["a_opt"][n]*system_solution["a_price"], digit_round)
+        solution_dict["a_cost"][n] =  round((system_solution["a_opt"][n]**2)*(sys_w_sigma**2)*system_data["gen_c2"][n], digit_round)
+        solution_dict["a_profit"][n] = round(solution_dict["a_revenue"][n] - solution_dict["a_cost"][n], digit_round)
         if "b_opt" in system_solution.keys():
-            solution_dict["b_revenue"][n] = system_solution["b_opt"][n]*system_solution["b_price"]
-            solution_dict["b_cost"][n] = system_solution["b_opt"][n]*3*sys_w_sigma*system_data["gen_cbeta"][n]
-            solution_dict["b_profit"][n] = solution_dict["b_revenue"][n] - solution_dict["b_cost"][n]
+            solution_dict["b_revenue"][n] = round(system_solution["b_opt"][n]*system_solution["b_price"], digit_round)
+            solution_dict["b_cost"][n] = round(system_solution["b_opt"][n]*system_data["gen_cbeta"][n], digit_round)
+            solution_dict["b_profit"][n] = round(solution_dict["b_revenue"][n] - solution_dict["b_cost"][n], digit_round)
 
     return solution_dict
 
@@ -99,6 +98,9 @@ def zone_dispatch(system_data, system_solution):
 # Compute profit, cost, and revenue for each zone
 def zone_profit(system_data, system_solution):
     solution_dict = dict()
+    solution_dict["total_revenue_zone"] = dict()
+    solution_dict["total_cost_zone"] = dict()
+    solution_dict["total_profit_zone"] = dict()
     solution_dict["p_revenue_zone"] = dict()
     solution_dict["p_cost_zone"] = dict()
     solution_dict["p_profit_zone"] = dict()
@@ -120,10 +122,25 @@ def zone_profit(system_data, system_solution):
         solution_dict["a_revenue_zone"][i] = 0 + sum(gen_profit_dict["a_revenue"][n] for n in system_data["node_gens"][i])
         solution_dict["a_cost_zone"][i] = 0 + sum(gen_profit_dict["a_cost"][n] for n in system_data["node_gens"][i])
         solution_dict["a_profit_zone"][i] = 0 + sum(gen_profit_dict["a_profit"][n] for n in system_data["node_gens"][i])
+
+        solution_dict["total_revenue_zone"][i] = 0 + solution_dict["p_revenue_zone"][i] + solution_dict["a_revenue_zone"][i]
+        solution_dict["total_cost_zone"][i] = 0 + solution_dict["p_cost_zone"][i] + solution_dict["a_cost_zone"][i]
+        solution_dict["total_profit_zone"][i] = 0 + solution_dict["p_profit_zone"][i] + solution_dict["a_profit_zone"][i]
+
         if "b_opt" in system_solution.keys():
             solution_dict["b_revenue_zone"][i] = 0 + sum(gen_profit_dict["b_revenue"][n] for n in system_data["node_gens"][i])
             solution_dict["b_cost_zone"][i] = 0 + sum(gen_profit_dict["b_cost"][n] for n in system_data["node_gens"][i])    
-            solution_dict["b_profit_zone"][i] = 0 + sum(gen_profit_dict["b_profit"][n] for n in system_data["node_gens"][i])    
+            solution_dict["b_profit_zone"][i] = 0 + sum(gen_profit_dict["b_profit"][n] for n in system_data["node_gens"][i])
+            
+            solution_dict["total_revenue_zone"][i] += solution_dict["b_revenue_zone"][i]
+            solution_dict["total_cost_zone"][i] += solution_dict["b_cost_zone"][i]
+            solution_dict["total_profit_zone"][i] += solution_dict["b_profit_zone"][i] 
 
     return solution_dict
 
+# Save dict
+def save_dict(input_dict, name_file):
+    fo = open(name_file, "w")
+    for k, v in input_dict.items():
+        fo.write(str(k) + ' >>> '+ str(v) + '\n\n')
+    fo.close()
