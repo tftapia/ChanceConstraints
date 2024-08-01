@@ -14,8 +14,8 @@ def init_parameters():
     return system_param
 
 def init_dictionaries(system_flag = False):
-    string_path = "C:/Users/Tom/Desktop/Codes/ChanceConstraints/ChanceConstraints-1/"
-    #string_path = "/Users/tftapia/Desktop/TT_Codes/ChanceContraints/ChanceConstraints/"
+    #string_path = "C:/Users/Tom/Desktop/Codes/ChanceConstraints/ChanceConstraints-1/"
+    string_path = "/Users/tftapia/Desktop/TT_Codes/ChanceContraints/ChanceConstraints/"
 
     system_dict = dict()
     system_dict["node_demand"] = dict()

@@ -13,10 +13,10 @@ from project_models import ED_LDT_CC_alternative, ED_LDT_CC_alternative_price, E
 
 test_list = ["CC","LDT-WCC","LDT-CC"] # options ["CC", "WCC", "LDT-WCC", "LDT-CC"]
 developer_mode = False
-system_mode = True
-scenario_mode = True
-profit_mode = True
-plot_mode = True
+system_mode = False
+scenario_mode = False
+profit_mode = False
+plot_mode = False
 
 if system_mode:
     scenarios_max = 3000
