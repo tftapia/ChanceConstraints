@@ -108,11 +108,11 @@ def init_dictionaries(system_flag = False):
             system_dict["node_demand"][node_index] = df_node[zones[node_index]].mean()
 
         for gen_index in df_gen.index:
-            system_dict["gen_pmax"][gen_index] = 0.7*df_gen["Capacity (MW)"][gen_index]
+            system_dict["gen_pmax"][gen_index] = df_gen["Capacity (MW)"][gen_index]
             system_dict["gen_c1"][gen_index] = df_gen["Dispatch Cost Coefficient a ($/MWh)"][gen_index]
-            system_dict["gen_c2"][gen_index] = 1.1*df_gen["Dispatch Cost Coefficient b ($/MW^2h)"][gen_index]
+            system_dict["gen_c2"][gen_index] = df_gen["Dispatch Cost Coefficient b ($/MW^2h)"][gen_index]
             system_dict["gen_calpha"][gen_index] = df_gen["Regular Reserve Cost Coefficient ($/MWh)"][gen_index]
-            system_dict["gen_cbeta"][gen_index] = 1.1*df_gen["Extreme Reserve Cost Coefficient ($/MWh)"][gen_index]
+            system_dict["gen_cbeta"][gen_index] = df_gen["Extreme Reserve Cost Coefficient ($/MWh)"][gen_index]
             system_dict["gen_node"][gen_index] = np.where(zones == df_gen['Zone Location'][gen_index])[0][0]
         
         for wind_index in range(len(zones)): #create a wind generator in each zone

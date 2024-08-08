@@ -753,8 +753,6 @@ def test_scenarios(system_data, system_param, system_solution, scenarios_max, te
 
 
 
-
-
 def ED_LDT_CC_alternative(system_data, system_param, flag_developer_mode = False, digit_round = 4):
     #Auxilar parameters
     sys_inv_phi_eps = norm.ppf(1- system_param["sys_epsilon"])
