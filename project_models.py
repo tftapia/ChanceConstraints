@@ -123,7 +123,7 @@ def ED_standard_CC_network(system_data, system_param, flag_developer_mode = Fals
 def ED_LDT_CC_network(system_data, system_param, flag_developer_mode = False, digit_round = 4):
     #Auxilar parameters
     sys_inv_phi_eps = norm.ppf(1- system_param["sys_epsilon"])
-    sys_inv_phi_eps_ext = norm.ppf(1-system_param["sys_epsilon_ext"])
+    sys_inv_phi_eps_ext = norm.ppf(system_param["sys_epsilon_ext"])
     sys_w_mean = sum(system_data["wind_mean"].values())
     sys_w_sigma = sum(system_data["wind_std"].values())
 
@@ -518,7 +518,7 @@ def ED_LDT_WCC_network(system_data, system_param, sys_w_star, flag_developer_mod
 def ED_LDT_CC_price(system_data, system_param, sys_w_star, flag_developer_mode = False, digit_round = 4):
     #Auxilar parameters
     sys_inv_phi_eps = norm.ppf(1- system_param["sys_epsilon"])
-    sys_inv_phi_eps_ext = norm.ppf(1-system_param["sys_epsilon_ext"])
+    sys_inv_phi_eps_ext = norm.ppf(system_param["sys_epsilon_ext"])
     sys_w_mean = sum(system_data["wind_mean"].values())
     sys_w_sigma = sum(system_data["wind_std"].values())
 
@@ -756,7 +756,7 @@ def test_scenarios(system_data, system_param, system_solution, scenarios_max, te
 def ED_LDT_CC_alternative(system_data, system_param, flag_developer_mode = False, digit_round = 4):
     #Auxilar parameters
     sys_inv_phi_eps = norm.ppf(1- system_param["sys_epsilon"])
-    sys_inv_phi_eps_ext = norm.ppf(1-system_param["sys_epsilon_ext"])
+    sys_inv_phi_eps_ext = norm.ppf(system_param["sys_epsilon_ext"])
     sys_w_mean = sum(system_data["wind_mean"].values())
     sys_w_sigma = sum(system_data["wind_std"].values())
 
