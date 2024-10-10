@@ -18,12 +18,9 @@ scenario_mode = False
 profit_mode = False
 plot_mode = False
 
-if system_mode:
-    scenarios_max = 3000
-    seed = 4 
-else: 
-    scenarios_max = 3000
-    seed = 4
+scenarios_max = 3000
+seed = 4 
+
 
 param = init_parameters()
 data = init_dictionaries(system_mode)
